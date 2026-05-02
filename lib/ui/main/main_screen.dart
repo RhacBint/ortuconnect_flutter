@@ -6,7 +6,7 @@ import '../perizinan/perizinan_screen.dart';
 import '../profile/profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -52,7 +52,7 @@ class _MainScreenState extends State<MainScreen> {
         color: const Color(0xFFF5F5F5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -82,7 +82,7 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? const Color(0xFF0F53BF).withOpacity(0.12)
+                        ? const Color(0xFF0F53BF).withValues(alpha: 0.12)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                   ),

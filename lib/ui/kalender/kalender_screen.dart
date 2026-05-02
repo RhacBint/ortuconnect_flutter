@@ -17,7 +17,7 @@ class AgendaItem {
 }
 
 class KalenderScreen extends StatefulWidget {
-  const KalenderScreen({Key? key}) : super(key: key);
+  const KalenderScreen({super.key});
 
   @override
   State<KalenderScreen> createState() => _KalenderScreenState();
@@ -48,7 +48,7 @@ class _KalenderScreenState extends State<KalenderScreen> {
         'https://ortuconnect.pbltifnganjuk.com/api/admin/agenda.php?month=$month&year=$year');
 
     try {
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
@@ -164,7 +164,7 @@ class _KalenderScreenState extends State<KalenderScreen> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
@@ -259,7 +259,7 @@ class _KalenderScreenState extends State<KalenderScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.10),
+            color: Colors.black.withValues(alpha: 0.10),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),

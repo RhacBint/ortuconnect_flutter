@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
 class AbsensiScreen extends StatefulWidget {
-  const AbsensiScreen({Key? key}) : super(key: key);
+  const AbsensiScreen({super.key});
 
   @override
   State<AbsensiScreen> createState() => _AbsensiScreenState();
@@ -54,13 +54,15 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _loadAbsensi();
+      _loadFromSession();
     }
   }
 
   // ---------------- Data Loading ----------------
 
   Future<void> _loadFromSession() async {
+    if (mounted) setState(() => _isLoading = true);
+
     final prefs = await SharedPreferences.getInstance();
     _username = prefs.getString('username') ?? '';
     _idSiswa = prefs.getString('id_siswa') ?? '';
@@ -199,7 +201,7 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -317,7 +319,7 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.10),
+                color: Colors.black.withValues(alpha: 0.10),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -358,7 +360,7 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(

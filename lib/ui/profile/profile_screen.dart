@@ -7,10 +7,10 @@ import '../../core/session_manager.dart';
 import '../login/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  const ProfileScreen({super.key});
 
   @override
-  _ProfileScreenState createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
@@ -64,6 +64,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         body: {'username': username, ...updatedData},
       );
       if (response.statusCode == 200) {
+        // Coba baca pesan dari server
+        String serverMessage = 'Berhasil update profil';
+        try {
+          final resBody = json.decode(response.body) as Map<String, dynamic>;
+          if (resBody['success'] == true) {
+            serverMessage = resBody['message']?.toString() ?? 'Berhasil update profil';
+          } else {
+            // Server kembalikan 200 tapi success = false
+            final errMsg = resBody['message']?.toString() ?? 'Gagal update profil';
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(errMsg), backgroundColor: Colors.red),
+              );
+            }
+            return;
+          }
+        } catch (_) {
+          // Body bukan JSON, tetap anggap sukses
+        }
+
         // Update gender icon di SharedPreferences agar dashboard ikut berubah
         final newGender = updatedData['gender'] ?? '';
         if (newGender.isNotEmpty) {
@@ -73,19 +93,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Berhasil update profil')),
+            SnackBar(content: Text(serverMessage)),
           );
         }
         await _fetchProfileData();
       } else {
+        // Coba baca pesan error dari body
+        String errMsg = 'Gagal update (${response.statusCode})';
+        try {
+          final resBody = json.decode(response.body) as Map<String, dynamic>;
+          errMsg = resBody['message']?.toString() ?? errMsg;
+        } catch (_) {}
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Gagal update')),
+            SnackBar(content: Text(errMsg), backgroundColor: Colors.red),
           );
         }
       }
     } catch (e) {
       debugPrint("Error updating profile: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Terjadi kesalahan koneksi'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -134,7 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     _buildTextField(addressController, "Alamat"),
                     DropdownButtonFormField<String>(
-                      value: ["Laki-Laki", "Perempuan"].contains(selectedGender) ? selectedGender : "Laki-Laki",
+                      initialValue: ["Laki-Laki", "Perempuan"].contains(selectedGender) ? selectedGender : "Laki-Laki",
                       items: const [
                         DropdownMenuItem(value: "Laki-Laki", child: Text("Laki-Laki")),
                         DropdownMenuItem(value: "Perempuan", child: Text("Perempuan")),
@@ -197,12 +231,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(
             onPressed: () async {
               await SessionManager().logoutUser();
-              if (mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
+              if (!context.mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
             },
             child: const Text("Ya"),
           ),

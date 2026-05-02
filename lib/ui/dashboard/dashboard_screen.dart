@@ -8,7 +8,7 @@ import '../../core/session_manager.dart';
 import '../../core/notification_service.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
+  const DashboardScreen({super.key});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -50,7 +50,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadFromSession();
-      // Cek perubahan status izin dan agenda saat app dibuka kembali
       if (_username.isNotEmpty) {
         NotificationService().checkAll(_username);
       }
@@ -58,12 +57,17 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Future<void> _loadFromSession() async {
+    if (mounted) setState(() => _isLoading = true);
+
     final prefs = await SharedPreferences.getInstance();
     _username = prefs.getString('username') ?? '';
     _idSiswa = prefs.getString('id_siswa') ?? '';
     _genderIcon = prefs.getString('profile_gender_icon') ?? 'cowo';
 
-    if (_username.isEmpty) { _logout(); return; }
+    if (_username.isEmpty) {
+      _logout();
+      return;
+    }
 
     if (_idSiswa.isEmpty) {
       await _loadProfileFirst();
@@ -74,7 +78,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
   Future<void> _loadProfileFirst() async {
     try {
-      final response = await http.get(Uri.parse('$_apiProfile$_username'))
+      final response = await http
+          .get(Uri.parse('$_apiProfile$_username'))
           .timeout(const Duration(seconds: 15));
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
@@ -86,8 +91,11 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         final gender = profileData['gender']?.toString().toLowerCase() ?? '';
         _genderIcon = gender.contains('perempuan') ? 'cewe' : 'cowo';
         await prefs.setString('profile_gender_icon', _genderIcon);
-        if (_idSiswa.isNotEmpty) await _loadDashboard();
-        else _setError('ID Siswa tidak ditemukan di profil');
+        if (_idSiswa.isNotEmpty) {
+          await _loadDashboard();
+        } else {
+          _setError('ID Siswa tidak ditemukan di profil');
+        }
       } else {
         _setError('Profil tidak aktif atau tidak ditemukan');
         _logout();
@@ -99,12 +107,19 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
   Future<void> _loadDashboard() async {
     try {
-      final response = await http.get(Uri.parse('$_apiDashboard$_idSiswa'))
+      final response = await http
+          .get(Uri.parse('$_apiDashboard$_idSiswa'))
           .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) { _setError('Server Error (${response.statusCode})'); return; }
+      if (response.statusCode != 200) {
+        _setError('Server Error (${response.statusCode})');
+        return;
+      }
 
       final res = jsonDecode(response.body) as Map<String, dynamic>;
-      if (res['status'] != 'success') { _setError(res['message']?.toString() ?? 'Gagal mengambil data'); return; }
+      if (res['status'] != 'success') {
+        _setError(res['message']?.toString() ?? 'Gagal mengambil data');
+        return;
+      }
 
       if (res.containsKey('profil')) {
         final p = res['profil'] as Map<String, dynamic>;
@@ -121,7 +136,12 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
       _parseIzin(res);
 
-      if (mounted) setState(() { _isLoading = false; _errorMessage = null; });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = null;
+        });
+      }
     } catch (e) {
       _setError('Gagal memuat dashboard: $e');
     }
@@ -169,7 +189,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     if (rawIzin is Map<String, dynamic>) {
       latestIzin = rawIzin;
     } else if (rawIzin is List && rawIzin.isNotEmpty) {
-      latestIzin = rawIzin.first;
+      latestIzin = rawIzin.first as Map<String, dynamic>;
     }
 
     if (latestIzin != null) {
@@ -187,8 +207,10 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
   DateTime? _parseDate(String dateStr) {
     final formats = ['yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd', 'dd-MM-yyyy'];
-    for (var f in formats) {
-      try { return DateFormat(f).parse(dateStr); } catch (_) {}
+    for (final f in formats) {
+      try {
+        return DateFormat(f).parse(dateStr);
+      } catch (_) {}
     }
     return null;
   }
@@ -197,11 +219,18 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     try {
       final date = DateFormat('yyyy-MM-dd').parse(tanggal.trim());
       return DateFormat('dd MMMM yyyy', 'id_ID').format(date);
-    } catch (_) { return tanggal; }
+    } catch (_) {
+      return tanggal;
+    }
   }
 
   void _setError(String msg) {
-    if (mounted) setState(() { _isLoading = false; _errorMessage = msg; });
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = msg;
+      });
+    }
   }
 
   Future<void> _logout() async {
@@ -214,7 +243,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Future<void> _refreshDatabase() async {
-    setState(() => _isLoading = true);
     await _loadFromSession();
   }
 
@@ -235,7 +263,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header — tanpa tombol logout
             const Padding(
               padding: EdgeInsets.fromLTRB(24, 22, 24, 8),
               child: Text(
@@ -276,8 +303,15 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
             children: [
               const Icon(Icons.info_outline, color: Colors.white70, size: 48),
               const SizedBox(height: 16),
-              Text(_errorMessage!, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
-              TextButton(onPressed: _refreshDatabase, child: const Text('Coba Lagi', style: TextStyle(color: Colors.white))),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+              TextButton(
+                onPressed: _refreshDatabase,
+                child: const Text('Coba Lagi', style: TextStyle(color: Colors.white)),
+              ),
             ],
           ),
         ),
@@ -312,7 +346,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
+            color: Colors.black.withValues(alpha: 0.18),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -376,7 +410,10 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
           ),
           if (_agendaDate.isNotEmpty) ...[
             const SizedBox(height: 3),
-            Text(_agendaDate, style: const TextStyle(color: Color(0xFF0F53BF), fontSize: 13)),
+            Text(
+              _agendaDate,
+              style: const TextStyle(color: Color(0xFF0F53BF), fontSize: 13),
+            ),
           ],
         ],
       ),
@@ -425,7 +462,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.13),
+            color: Colors.black.withValues(alpha: 0.13),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),

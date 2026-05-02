@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
 class PerizinanScreen extends StatefulWidget {
-  const PerizinanScreen({Key? key}) : super(key: key);
+  const PerizinanScreen({super.key});
 
   @override
   State<PerizinanScreen> createState() => _PerizinanScreenState();
@@ -280,7 +280,7 @@ class _PerizinanScreenState extends State<PerizinanScreen> with WidgetsBindingOb
             
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedJenis,
+              initialValue: _selectedJenis,
               decoration: const InputDecoration(labelText: 'Jenis Izin', border: OutlineInputBorder()),
               items: _jenisIzin.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
               onChanged: (val) => setState(() => _selectedJenis = val!),
@@ -337,7 +337,7 @@ class _PerizinanScreenState extends State<PerizinanScreen> with WidgetsBindingOb
         const Text('Riwayat Izin', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20)),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedMonthFilter,
@@ -411,7 +411,7 @@ class _PerizinanScreenState extends State<PerizinanScreen> with WidgetsBindingOb
         subtitle: Text(jenis, style: const TextStyle(color: Colors.black54)),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: statusColor)),
+          decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: statusColor)),
           child: Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
         ),
         children: [

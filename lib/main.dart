@@ -13,7 +13,7 @@ void main() async {
 }
 
 class OrtuConnectApp extends StatelessWidget {
-  const OrtuConnectApp({Key? key}) : super(key: key);
+  const OrtuConnectApp({super.key});
 
   @override
   Widget build(BuildContext context) {
