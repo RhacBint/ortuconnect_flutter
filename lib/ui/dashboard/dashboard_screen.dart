@@ -52,6 +52,10 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       _loadFromSession();
       if (_username.isNotEmpty) {
         NotificationService().checkAll(_username);
+        if (_idSiswa.isNotEmpty) {
+          NotificationService().checkAbsensiHariIni(_idSiswa, _namaSiswa);
+          NotificationService().checkRekapMingguan(_idSiswa, _namaSiswa);
+        }
       }
     }
   }
@@ -63,6 +67,14 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     _username = prefs.getString('username') ?? '';
     _idSiswa = prefs.getString('id_siswa') ?? '';
     _genderIcon = prefs.getString('profile_gender_icon') ?? 'cowo';
+
+    // Debug: tampilkan FCM token di console
+    final fcmToken = prefs.getString('fcm_token') ?? '';
+    if (fcmToken.isNotEmpty) {
+      debugPrint('=== FCM TOKEN ===');
+      debugPrint(fcmToken);
+      debugPrint('================');
+    }
 
     if (_username.isEmpty) {
       _logout();
@@ -121,7 +133,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         return;
       }
 
-      if (res.containsKey('profil')) {
+      if (res['profil'] is Map) {
         final p = res['profil'] as Map<String, dynamic>;
         _namaSiswa = p['nama_siswa']?.toString() ?? 'Nama tidak tersedia';
         _kelas = p['kelas']?.toString() ?? 'Kelas tidak tersedia';
@@ -129,12 +141,18 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
       _parseAgenda(res);
 
-      if (res.containsKey('kehadiran_minggu_ini')) {
+      if (res.containsKey('kehadiran_minggu_ini') && res['kehadiran_minggu_ini'] is Map) {
         final k = res['kehadiran_minggu_ini'] as Map<String, dynamic>;
         _kehadiranStatus = 'Hadir: ${k['hadir'] ?? '0'}/${k['total_hari'] ?? '5'} hari';
       }
 
       _parseIzin(res);
+
+      // Cek absensi hari ini setelah data profil tersedia
+      if (_idSiswa.isNotEmpty && _namaSiswa.isNotEmpty) {
+        NotificationService().checkAbsensiHariIni(_idSiswa, _namaSiswa);
+        NotificationService().checkRekapMingguan(_idSiswa, _namaSiswa);
+      }
 
       if (mounted) {
         setState(() {
@@ -150,8 +168,18 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   void _parseAgenda(Map<String, dynamic> res) {
     _agendaTitle = 'Tidak ada agenda/pengumuman';
     _agendaDate = '';
-    if (!res.containsKey('agenda')) return;
-    final agendaList = res['agenda'] as List<dynamic>;
+    if (!res.containsKey('agenda') || res['agenda'] == null) return;
+
+    // API bisa mengembalikan List atau Map — normalise ke List
+    final raw = res['agenda'];
+    List<dynamic> agendaList;
+    if (raw is List) {
+      agendaList = raw;
+    } else if (raw is Map) {
+      agendaList = raw.values.toList();
+    } else {
+      return;
+    }
     if (agendaList.isEmpty) return;
 
     final now = DateTime.now();
@@ -159,7 +187,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     Duration? closestDiff;
 
     for (final item in agendaList) {
-      final agenda = item as Map<String, dynamic>;
+      if (item is! Map<String, dynamic>) continue;
+      final agenda = item;
       final dateStr = agenda['tanggal']?.toString() ?? '';
       if (dateStr.isEmpty) continue;
       final agendaTime = _parseDate(dateStr);
@@ -189,7 +218,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     if (rawIzin is Map<String, dynamic>) {
       latestIzin = rawIzin;
     } else if (rawIzin is List && rawIzin.isNotEmpty) {
-      latestIzin = rawIzin.first as Map<String, dynamic>;
+      final first = rawIzin.first;
+      if (first is Map<String, dynamic>) latestIzin = first;
     }
 
     if (latestIzin != null) {

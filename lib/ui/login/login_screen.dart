@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../core/session_manager.dart';
+import '../../core/notification_service.dart';
 import '../main/main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -104,6 +105,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           user['id_akun'].toString(),
           user['role'].toString(),
         );
+
+        // Kirim FCM token ke server setelah login berhasil
+        final fcmToken = await NotificationService().getFcmToken();
+        if (fcmToken != null && fcmToken.isNotEmpty) {
+          _sendFcmTokenToServer(username, fcmToken);
+        }
+
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
@@ -126,6 +134,19 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // Kirim FCM token ke server (fire and forget, tidak perlu tunggu)
+  void _sendFcmTokenToServer(String username, String fcmToken) {
+    http.post(
+      Uri.parse('https://ortuconnect.pbltifnganjuk.com/api/save_fcm_token.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'username': username, 'fcm_token': fcmToken}),
+    ).timeout(const Duration(seconds: 10)).then((response) {
+      debugPrint('FCM token sent: ${response.body}');
+    }).catchError((e) {
+      debugPrint('FCM token send failed: $e');
+    });
   }
 
   void _showToast(String message) {

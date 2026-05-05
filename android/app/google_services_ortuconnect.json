@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "729467281649",
+    "project_id": "ortuconnect-2e78e",
+    "storage_bucket": "ortuconnect-2e78e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:729467281649:android:796ac07425502ddd37c950",
+        "android_client_info": {
+          "package_name": "com.example.mobiles_tktech.ortuconnect_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1fBBUIaFUsO3iDYSVPxX2QFb5fgWFFEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
