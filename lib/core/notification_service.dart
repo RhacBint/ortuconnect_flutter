@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'notification_database.dart';
 
 // Handler untuk notifikasi saat app di background/terminated (harus top-level function)
 @pragma('vm:entry-point')
@@ -80,11 +81,16 @@ class NotificationService {
       await prefs.setString(_keyFcmToken, token);
     }
 
-    // Refresh token otomatis
+    // Refresh token otomatis — langsung kirim ke server
     _fcm.onTokenRefresh.listen((newToken) async {
       debugPrint('FCM Token refreshed: $newToken');
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyFcmToken, newToken);
+      // Kirim token baru ke server
+      final username = prefs.getString('username') ?? '';
+      if (username.isNotEmpty) {
+        await _sendTokenToServer(username, newToken);
+      }
     });
 
     // Notifikasi saat app di foreground
@@ -112,11 +118,26 @@ class NotificationService {
     return prefs.getString(_keyFcmToken);
   }
 
-  // Tampilkan notifikasi lokal
+  // Kirim FCM token ke server
+  Future<void> _sendTokenToServer(String username, String token) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://ortuconnect.pbltifnganjuk.com/api/save_fcm_token.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'username': username, 'fcm_token': token}),
+      ).timeout(const Duration(seconds: 10));
+      debugPrint('FCM token auto-refreshed to server: ${response.body}');
+    } catch (e) {
+      debugPrint('FCM token refresh to server failed: $e');
+    }
+  }
+
+  // Tampilkan notifikasi lokal dan simpan ke riwayat
   Future<void> showNotification({
     required int id,
     required String title,
     required String body,
+    String type = 'fcm',
   }) async {
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
@@ -130,6 +151,14 @@ class NotificationService {
     const NotificationDetails details =
         NotificationDetails(android: androidDetails);
     await _plugin.show(id: id, title: title, body: body, notificationDetails: details);
+
+    // Simpan ke riwayat notifikasi
+    await NotificationDatabase().insert(NotificationItem(
+      title: title,
+      body: body,
+      type: type,
+      timestamp: DateTime.now(),
+    ));
   }
 
   // Cek perubahan status izin dan tampilkan notif jika berubah
@@ -166,7 +195,7 @@ class NotificationService {
         } else {
           body = 'Status izin $jenis berubah menjadi $currentStatus.';
         }
-        await showNotification(id: 1, title: title, body: body);
+        await showNotification(id: 1, title: title, body: body, type: 'izin');
       }
 
       await prefs.setString(_keyLastIzinId, currentId);
@@ -206,14 +235,22 @@ class NotificationService {
         }
 
         final diff = agendaDate.difference(DateTime(now.year, now.month, now.day)).inDays;
-        if (diff >= 1 && diff <= 3) {
+        if (diff >= 0 && diff <= 3) {
           final notifKey = '${agendaId}_H$diff';
           if (!notifiedIds.contains(notifKey)) {
-            final title = diff == 1 ? '📅 Besok Ada Kegiatan!' : '📅 Kegiatan $diff Hari Lagi';
-            final body = diff == 1
-                ? '$namaKegiatan akan berlangsung besok.'
-                : '$namaKegiatan akan berlangsung dalam $diff hari.';
-            await showNotification(id: agendaId.hashCode + diff, title: title, body: body);
+            String title;
+            String body;
+            if (diff == 0) {
+              title = '📅 Kegiatan Hari Ini!';
+              body = '$namaKegiatan berlangsung hari ini.';
+            } else if (diff == 1) {
+              title = '📅 Besok Ada Kegiatan!';
+              body = '$namaKegiatan akan berlangsung besok.';
+            } else {
+              title = '📅 Kegiatan $diff Hari Lagi';
+              body = '$namaKegiatan akan berlangsung dalam $diff hari.';
+            }
+            await showNotification(id: agendaId.hashCode + diff, title: title, body: body, type: 'agenda');
             notifiedIds.add(notifKey);
           }
         }
@@ -281,11 +318,7 @@ class NotificationService {
         }
 
         if (title.isNotEmpty) {
-          await showNotification(
-            id: 200,
-            title: title,
-            body: body,
-          );
+          await showNotification(id: 200, title: title, body: body, type: 'absensi');
           await prefs.setString(_keyLastAbsensiNotif, todayStr);
         }
         break;
@@ -381,7 +414,7 @@ class NotificationService {
         title = '📊 Rekap Minggu Ini — $namaSiswa';
       }
 
-      await showNotification(id: 300, title: title, body: body.toString());
+      await showNotification(id: 300, title: title, body: body.toString(), type: 'rekap');
       await prefs.setString(_keyLastRekapNotif, weekKey);
     } catch (e) {
       // Silent fail

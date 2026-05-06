@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class AbsensiScreen extends StatefulWidget {
   const AbsensiScreen({super.key});
@@ -12,36 +13,31 @@ class AbsensiScreen extends StatefulWidget {
 }
 
 class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserver {
-  // ---------------- API URLs ----------------
   static const String _apiProfile = 'https://ortuconnect.pbltifnganjuk.com/api/profile.php?username=';
   static const String _apiAbsensi = 'https://ortuconnect.pbltifnganjuk.com/api/admin/absensi.php';
 
-  // ---------------- State variables ----------------
   bool _isLoading = true;
   String? _errorMessage;
   List<dynamic> _listAbsensi = [];
 
   String _username = '';
   String _idSiswa = '';
-  
+
   late int _selectedYear;
-  late int _selectedMonth; // 1-12
+  late int _selectedMonth;
 
   final List<String> _bulanArray = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
 
-  // ---------------- Lifecycle ----------------
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    
     final now = DateTime.now();
     _selectedYear = now.year;
     _selectedMonth = now.month;
-
     _loadFromSession();
   }
 
@@ -58,17 +54,12 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
     }
   }
 
-  // ---------------- Data Loading ----------------
-
   Future<void> _loadFromSession() async {
     if (mounted) setState(() => _isLoading = true);
-
     final prefs = await SharedPreferences.getInstance();
     _username = prefs.getString('username') ?? '';
     _idSiswa = prefs.getString('id_siswa') ?? '';
-
     if (_username.isEmpty) return;
-
     if (_idSiswa.isEmpty) {
       await _loadProfileFirst();
     } else {
@@ -81,14 +72,11 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
       final url = Uri.parse('$_apiProfile$_username');
       final response = await http.get(url).timeout(const Duration(seconds: 15));
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-
       if (data['success'] == true) {
         final profileData = data['data'] as Map<String, dynamic>;
         _idSiswa = profileData['id_siswa']?.toString() ?? '';
-        
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('id_siswa', _idSiswa);
-
         await _loadAbsensi();
       } else {
         _setError('Gagal mendapatkan profil siswa');
@@ -100,30 +88,16 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
 
   Future<void> _loadAbsensi() async {
     if (_idSiswa.isEmpty) return;
-
     try {
       if (mounted) setState(() => _isLoading = true);
-
-      // Format: YYYY-MM
       final bulanStr = _selectedMonth.toString().padLeft(2, '0');
       final url = Uri.parse('$_apiAbsensi?id_siswa=$_idSiswa&bulan=$_selectedYear-$bulanStr');
-      debugPrint('Fetching Absensi: $url');
-
       final response = await http.get(url).timeout(const Duration(seconds: 15));
       final res = jsonDecode(response.body) as Map<String, dynamic>;
-
       if (res['status'] == 'success') {
         _listAbsensi = res['riwayat'] as List<dynamic>;
-        
-        // Urutkan tanggal terbaru ke terlama
         _listAbsensi.sort((a, b) => b['tanggal'].compareTo(a['tanggal']));
-        
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = null;
-          });
-        }
+        if (mounted) setState(() { _isLoading = false; _errorMessage = null; });
       } else {
         _setError(res['message']?.toString() ?? 'Data tidak tersedia');
       }
@@ -133,21 +107,32 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
   }
 
   void _setError(String msg) {
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = msg;
-      });
-    }
+    if (mounted) setState(() { _isLoading = false; _errorMessage = msg; });
   }
 
-  // ---------------- Helpers ----------------
+  // Hitung statistik dari _listAbsensi
+  Map<String, int> _getStats() {
+    int hadir = 0, izin = 0, sakit = 0, alpha = 0;
+    for (final item in _listAbsensi) {
+      final status = item['status']?.toString().toUpperCase() ?? '';
+      if (status == 'HADIR') {
+        hadir++;
+      } else if (status == 'IZIN') {
+        izin++;
+      } else if (status == 'SAKIT') {
+        sakit++;
+      } else if (status == 'ALPHA' || status == 'ALPA') {
+        alpha++;
+      }
+    }
+    return {'hadir': hadir, 'izin': izin, 'sakit': sakit, 'alpha': alpha};
+  }
 
   Color _getStatusColor(String status) {
     switch (status.toUpperCase()) {
       case 'HADIR': return const Color(0xFF4CAF50);
       case 'IZIN': return const Color(0xFF2196F3);
-      case 'SAKIT': return const Color(0xFFF44336);
+      case 'SAKIT': return const Color(0xFFFF9800);
       case 'ALPHA':
       case 'ALPA': return const Color(0xFFF44336);
       default: return Colors.grey;
@@ -161,7 +146,6 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
     } catch (_) { return tanggal; }
   }
 
-  // ---------------- Build ----------------
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -193,7 +177,6 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
                       letterSpacing: 0.3,
                     ),
                   ),
-                  // Dropdown bulan di header
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
@@ -236,7 +219,6 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
               ),
             ),
 
-            // Content
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _loadAbsensi,
@@ -245,11 +227,217 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
                     ? const Center(child: CircularProgressIndicator(color: Colors.white))
                     : _errorMessage != null
                         ? _buildErrorView()
-                        : _buildList(),
+                        : _buildContent(),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (_listAbsensi.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+          const Center(
+            child: Column(
+              children: [
+                Icon(Icons.event_busy_rounded, color: Colors.white54, size: 64),
+                SizedBox(height: 12),
+                Text(
+                  'Tidak ada data absensi\nbulan ini',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      children: [
+        // Grafik Pie
+        _buildChart(),
+        const SizedBox(height: 14),
+        // List absensi
+        ..._listAbsensi.map((item) {
+          final status = item['status']?.toString() ?? 'ALPHA';
+          final tanggal = item['tanggal']?.toString() ?? '';
+          final color = _getStatusColor(status);
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.10),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          status.toUpperCase(),
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _formatTanggal(tanggal),
+                          style: const TextStyle(fontSize: 13, color: Colors.black54),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _getStatusLabel(status),
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildChart() {
+    final stats = _getStats();
+    final total = stats.values.fold(0, (a, b) => a + b);
+    if (total == 0) return const SizedBox.shrink();
+
+    final sections = <PieChartSectionData>[];
+    final labels = <Widget>[];
+
+    void addSection(String label, int count, Color color) {
+      if (count == 0) return;
+      final pct = (count / total * 100).toStringAsFixed(0);
+      sections.add(PieChartSectionData(
+        value: count.toDouble(),
+        color: color,
+        title: '$pct%',
+        radius: 55,
+        titleStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ));
+      labels.add(Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 10, height: 10,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 4),
+          Text('$label ($count)',
+              style: const TextStyle(fontSize: 12, color: Colors.black87)),
+        ],
+      ));
+    }
+
+    addSection('Hadir', stats['hadir']!, const Color(0xFF4CAF50));
+    addSection('Izin', stats['izin']!, const Color(0xFF2196F3));
+    addSection('Sakit', stats['sakit']!, const Color(0xFFFF9800));
+    addSection('Alpha', stats['alpha']!, const Color(0xFFF44336));
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Statistik ${_bulanArray[_selectedMonth - 1]} $_selectedYear',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Color(0xFF68327E),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              SizedBox(
+                height: 140,
+                width: 140,
+                child: PieChart(
+                  PieChartData(
+                    sections: sections,
+                    centerSpaceRadius: 30,
+                    sectionsSpace: 2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total: $total hari',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...labels.map((l) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: l,
+                    )),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -276,107 +464,6 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildList() {
-    if (_listAbsensi.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-          Center(
-            child: Column(
-              children: [
-                const Icon(Icons.event_busy_rounded, color: Colors.white54, size: 64),
-                const SizedBox(height: 12),
-                const Text(
-                  'Tidak ada data absensi\nbulan ini',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-      itemCount: _listAbsensi.length,
-      itemBuilder: (context, index) {
-        final item = _listAbsensi[index];
-        final status = item['status']?.toString() ?? 'ALPHA';
-        final tanggal = item['tanggal']?.toString() ?? '';
-        final color = _getStatusColor(status);
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.10),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                // Dot indikator
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        status.toUpperCase(),
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        _formatTanggal(tanggal),
-                        style: const TextStyle(fontSize: 13, color: Colors.black54),
-                      ),
-                    ],
-                  ),
-                ),
-                // Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _getStatusLabel(status),
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
