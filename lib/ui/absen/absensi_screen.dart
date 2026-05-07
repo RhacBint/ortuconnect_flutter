@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../core/api_service.dart';
+import '../login/login_screen.dart';
 
 class AbsensiScreen extends StatefulWidget {
   const AbsensiScreen({super.key});
@@ -13,14 +13,9 @@ class AbsensiScreen extends StatefulWidget {
 }
 
 class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserver {
-  static const String _apiProfile = 'https://ortuconnect.pbltifnganjuk.com/api/profile.php?username=';
-  static const String _apiAbsensi = 'https://ortuconnect.pbltifnganjuk.com/api/admin/absensi.php';
-
   bool _isLoading = true;
   String? _errorMessage;
   List<dynamic> _listAbsensi = [];
-
-  String _username = '';
   String _idSiswa = '';
 
   late int _selectedYear;
@@ -38,7 +33,7 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
     final now = DateTime.now();
     _selectedYear = now.year;
     _selectedMonth = now.month;
-    _loadFromSession();
+    _loadAbsensi();
   }
 
   @override
@@ -50,59 +45,43 @@ class _AbsensiScreenState extends State<AbsensiScreen> with WidgetsBindingObserv
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _loadFromSession();
-    }
-  }
-
-  Future<void> _loadFromSession() async {
-    if (mounted) setState(() => _isLoading = true);
-    final prefs = await SharedPreferences.getInstance();
-    _username = prefs.getString('username') ?? '';
-    _idSiswa = prefs.getString('id_siswa') ?? '';
-    if (_username.isEmpty) return;
-    if (_idSiswa.isEmpty) {
-      await _loadProfileFirst();
-    } else {
-      await _loadAbsensi();
-    }
-  }
-
-  Future<void> _loadProfileFirst() async {
-    try {
-      final url = Uri.parse('$_apiProfile$_username');
-      final response = await http.get(url).timeout(const Duration(seconds: 15));
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] == true) {
-        final profileData = data['data'] as Map<String, dynamic>;
-        _idSiswa = profileData['id_siswa']?.toString() ?? '';
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('id_siswa', _idSiswa);
-        await _loadAbsensi();
-      } else {
-        _setError('Gagal mendapatkan profil siswa');
-      }
-    } catch (e) {
-      _setError('Koneksi terganggu');
+      _loadAbsensi();
     }
   }
 
   Future<void> _loadAbsensi() async {
-    if (_idSiswa.isEmpty) return;
+    if (mounted) setState(() => _isLoading = true);
     try {
-      if (mounted) setState(() => _isLoading = true);
+      // Ambil id_siswa dari session
+      final prefs = await SharedPreferences.getInstance();
+      _idSiswa = prefs.getString('id_siswa') ?? '';
+
       final bulanStr = _selectedMonth.toString().padLeft(2, '0');
-      final url = Uri.parse('$_apiAbsensi?id_siswa=$_idSiswa&bulan=$_selectedYear-$bulanStr');
-      final response = await http.get(url).timeout(const Duration(seconds: 15));
-      final res = jsonDecode(response.body) as Map<String, dynamic>;
-      if (res['status'] == 'success') {
-        _listAbsensi = res['riwayat'] as List<dynamic>;
-        _listAbsensi.sort((a, b) => b['tanggal'].compareTo(a['tanggal']));
+      final res = await ApiService().getAbsensi(_idSiswa, '$_selectedYear-$bulanStr');
+
+      if (res['success'] == true) {
+        final data = res['data'] as Map<String, dynamic>;
+        final absensiList = data['absensi'] as List<dynamic>? ?? [];
+        _listAbsensi = List.from(absensiList);
+        _listAbsensi.sort((a, b) =>
+            (b['tanggal'] ?? '').compareTo(a['tanggal'] ?? ''));
         if (mounted) setState(() { _isLoading = false; _errorMessage = null; });
       } else {
         _setError(res['message']?.toString() ?? 'Data tidak tersedia');
       }
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) {
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        }
+      } else {
+        _setError(e.message);
+      }
     } catch (e) {
-      _setError('Gagal memuat data absensi: $e');
+      _setError('Gagal memuat data absensi');
     }
   }
 

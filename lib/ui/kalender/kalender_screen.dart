@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../../core/api_service.dart';
 
 class AgendaItem {
   final String namaKegiatan;
@@ -39,81 +38,57 @@ class _KalenderScreenState extends State<KalenderScreen> {
   }
 
   Future<void> _fetchAgenda(int month, int year) async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-
-    final url = Uri.parse(
-        'https://ortuconnect.pbltifnganjuk.com/api/admin/agenda.php?month=$month&year=$year');
+    setState(() { _isLoading = true; _errorMessage = ''; });
 
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 15));
+      final res = await ApiService().getAgenda(month, year);
 
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-
-        if (jsonResponse['status'] == 'success') {
-          final List<dynamic> data = jsonResponse['data'] ?? [];
-          List<AgendaItem> tempList = data.map((obj) {
-            return AgendaItem(
-              namaKegiatan: obj['nama_kegiatan']?.toString() ?? 'Tanpa Judul',
-              tanggal: obj['tanggal']?.toString() ?? '',
-              deskripsi: obj['deskripsi']?.toString() ?? 'Tidak ada keterangan',
-            );
-          }).toList();
-
-          // 1. FILTER: Hapus tanggal yang sudah lewat (hanya tampilkan hari ini ke depan)
-          DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-          
-          tempList.removeWhere((item) {
-            try {
-              DateTime agendaDate = DateFormat("yyyy-MM-dd").parse(item.tanggal);
-              return agendaDate.isBefore(today);
-            } catch (e) {
-              return false; // Tetap pertahankan jika gagal parsing
-            }
-          });
-
-          // 2. SORT: Terdekat berada di urutan atas (Ascending)
-          tempList.sort((a, b) {
-            try {
-              DateTime dateA = DateFormat("yyyy-MM-dd").parse(a.tanggal);
-              DateTime dateB = DateFormat("yyyy-MM-dd").parse(b.tanggal);
-              return dateA.compareTo(dateB);
-            } catch (e) {
-              return 0;
-            }
-          });
-
-          setState(() {
-            _agendaList = tempList;
-            // Jika kosong setelah filter
-            if (_agendaList.isEmpty) {
-              _errorMessage = 'Tidak ada kegiatan (mendatang) di bulan ini';
-            }
-          });
-        } else {
-          setState(() {
-            _agendaList = [];
-            _errorMessage = 'Tidak ada agenda di bulan ini';
-          });
+      if (res['success'] == true) {
+        final raw = res['data'];
+        List<dynamic> data = [];
+        if (raw is Map) {
+          data = (raw['agenda'] as List<dynamic>?) ?? [];
+        } else if (raw is List) {
+          data = raw;
         }
-      } else {
-        setState(() {
-          _agendaList = [];
-          _errorMessage = 'Gagal memuat agenda: Server Error';
+
+        List<AgendaItem> tempList = data.map((obj) {
+          return AgendaItem(
+            namaKegiatan: obj['nama_kegiatan']?.toString() ?? 'Tanpa Judul',
+            tanggal:      obj['tanggal']?.toString() ?? '',
+            deskripsi:    obj['deskripsi']?.toString() ?? '',
+          );
+        }).toList();
+
+        // Filter: hanya hari ini ke depan
+        final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+        tempList.removeWhere((item) {
+          try {
+            return DateFormat('yyyy-MM-dd').parse(item.tanggal).isBefore(today);
+          } catch (_) { return false; }
         });
+
+        // Sort ascending
+        tempList.sort((a, b) {
+          try {
+            return DateFormat('yyyy-MM-dd').parse(a.tanggal)
+                .compareTo(DateFormat('yyyy-MM-dd').parse(b.tanggal));
+          } catch (_) { return 0; }
+        });
+
+        setState(() {
+          _agendaList = tempList;
+          if (_agendaList.isEmpty) _errorMessage = 'Tidak ada kegiatan mendatang di bulan ini';
+        });
+      } else {
+        setState(() { _agendaList = []; _errorMessage = 'Tidak ada agenda di bulan ini'; });
       }
+    } on ApiException catch (e) {
+      setState(() { _agendaList = []; _errorMessage = e.message; });
     } catch (e) {
-      setState(() {
-        _agendaList = [];
-        _errorMessage = 'Gagal memuat agenda. Periksa koneksi.';
-      });
+      setState(() { _agendaList = []; _errorMessage = 'Gagal memuat agenda. Periksa koneksi.'; });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 

@@ -1,10 +1,9 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'notification_database.dart';
+import 'api_service.dart';
 
 // Handler untuk notifikasi saat app di background/terminated (harus top-level function)
 @pragma('vm:entry-point')
@@ -121,12 +120,8 @@ class NotificationService {
   // Kirim FCM token ke server
   Future<void> _sendTokenToServer(String username, String token) async {
     try {
-      final response = await http.post(
-        Uri.parse('https://ortuconnect.pbltifnganjuk.com/api/save_fcm_token.php'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'username': username, 'fcm_token': token}),
-      ).timeout(const Duration(seconds: 10));
-      debugPrint('FCM token auto-refreshed to server: ${response.body}');
+      await ApiService().saveFcmToken(token);
+      debugPrint('FCM token auto-refreshed to server');
     } catch (e) {
       debugPrint('FCM token refresh to server failed: $e');
     }
@@ -162,38 +157,31 @@ class NotificationService {
   }
 
   // Cek perubahan status izin dan tampilkan notif jika berubah
-  Future<void> checkIzinStatusChange(String username) async {
-    if (username.isEmpty) return;
+  Future<void> checkIzinStatusChange(String idSiswa) async {
+    if (idSiswa.isEmpty) return;
     try {
-      final url = Uri.parse(
-          'https://ortuconnect.pbltifnganjuk.com/api/perizinan.php?username=$username');
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
-      final res = jsonDecode(response.body) as Map<String, dynamic>;
+      final res = await ApiService().getPerizinanStatus();
       if (res['success'] != true) return;
 
-      final List<dynamic> data = res['data'] as List<dynamic>;
-      if (data.isEmpty) return;
+      final data = res['data'] as Map<String, dynamic>?;
+      if (data == null) return;
 
-      final latestIzin = data.first as Map<String, dynamic>;
-      final currentId = latestIzin['id']?.toString() ?? '';
-      final currentStatus = latestIzin['status']?.toString() ?? '';
-      final jenis = latestIzin['jenis_izin']?.toString() ?? '';
+      final currentId     = data['id_izin']?.toString() ?? '';
+      final currentStatus = data['status']?.toString() ?? '';
 
       final prefs = await SharedPreferences.getInstance();
-      final lastId = prefs.getString(_keyLastIzinId) ?? '';
+      final lastId     = prefs.getString(_keyLastIzinId) ?? '';
       final lastStatus = prefs.getString(_keyLastIzinStatus) ?? '';
 
       if (currentId == lastId && currentStatus != lastStatus && lastStatus.isNotEmpty) {
         String title = 'Status Izin Diperbarui';
-        String body = '';
-        if (currentStatus.toLowerCase().contains('setuju')) {
+        String body  = 'Status izin berubah menjadi $currentStatus.';
+        if (currentStatus.toLowerCase().contains('setuju') || currentStatus.toLowerCase().contains('disetujui')) {
           title = '✅ Izin Disetujui';
-          body = 'Pengajuan izin $jenis kamu telah disetujui.';
-        } else if (currentStatus.toLowerCase().contains('tolak')) {
+          body  = 'Pengajuan izin kamu telah disetujui.';
+        } else if (currentStatus.toLowerCase().contains('tolak') || currentStatus.toLowerCase().contains('ditolak')) {
           title = '❌ Izin Ditolak';
-          body = 'Pengajuan izin $jenis kamu ditolak.';
-        } else {
-          body = 'Status izin $jenis berubah menjadi $currentStatus.';
+          body  = 'Pengajuan izin kamu ditolak.';
         }
         await showNotification(id: 1, title: title, body: body, type: 'izin');
       }
@@ -205,34 +193,27 @@ class NotificationService {
     }
   }
 
-  // Cek agenda mendatang dan tampilkan notif H-1 sampai H-3
+  // Cek agenda mendatang dan tampilkan notif H-0 sampai H-3
   Future<void> checkAgendaMendatang() async {
     try {
-      final now = DateTime.now();
-      final url = Uri.parse(
-          'https://ortuconnect.pbltifnganjuk.com/api/admin/agenda.php?month=${now.month}&year=${now.year}');
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
-      final res = jsonDecode(response.body) as Map<String, dynamic>;
-      if (res['status'] != 'success') return;
+      final res = await ApiService().getAgendaMendatang();
+      if (res['success'] != true) return;
 
-      final List<dynamic> data = res['data'] ?? [];
+      final List<dynamic> data = (res['data'] as List<dynamic>?) ?? [];
       if (data.isEmpty) return;
 
       final prefs = await SharedPreferences.getInstance();
       final notifiedIds = prefs.getStringList(_keyLastAgendaNotif) ?? [];
+      final now = DateTime.now();
 
       for (final item in data) {
         final namaKegiatan = item['nama_kegiatan']?.toString() ?? 'Kegiatan';
-        final tanggalStr = item['tanggal']?.toString() ?? '';
-        final agendaId = item['id']?.toString() ?? tanggalStr;
+        final tanggalStr   = item['tanggal']?.toString() ?? '';
+        final agendaId     = item['id_kegiatan']?.toString() ?? tanggalStr;
         if (tanggalStr.isEmpty) continue;
 
         DateTime? agendaDate;
-        try {
-          agendaDate = DateTime.parse(tanggalStr);
-        } catch (_) {
-          continue;
-        }
+        try { agendaDate = DateTime.parse(tanggalStr); } catch (_) { continue; }
 
         final diff = agendaDate.difference(DateTime(now.year, now.month, now.day)).inDays;
         if (diff >= 0 && diff <= 3) {
@@ -242,13 +223,13 @@ class NotificationService {
             String body;
             if (diff == 0) {
               title = '📅 Kegiatan Hari Ini!';
-              body = '$namaKegiatan berlangsung hari ini.';
+              body  = '$namaKegiatan berlangsung hari ini.';
             } else if (diff == 1) {
               title = '📅 Besok Ada Kegiatan!';
-              body = '$namaKegiatan akan berlangsung besok.';
+              body  = '$namaKegiatan akan berlangsung besok.';
             } else {
               title = '📅 Kegiatan $diff Hari Lagi';
-              body = '$namaKegiatan akan berlangsung dalam $diff hari.';
+              body  = '$namaKegiatan akan berlangsung dalam $diff hari.';
             }
             await showNotification(id: agendaId.hashCode + diff, title: title, body: body, type: 'agenda');
             notifiedIds.add(notifKey);
@@ -262,8 +243,8 @@ class NotificationService {
   }
 
   // Panggil semua pengecekan sekaligus
-  Future<void> checkAll(String username) async {
-    await checkIzinStatusChange(username);
+  Future<void> checkAll(String idSiswa) async {
+    await checkIzinStatusChange(idSiswa);
     await checkAgendaMendatang();
   }
 
@@ -272,47 +253,35 @@ class NotificationService {
     if (idSiswa.isEmpty) return;
     try {
       final now = DateTime.now();
-      final todayStr =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
-      // Cek apakah sudah pernah notif hari ini
       final prefs = await SharedPreferences.getInstance();
-      final lastNotifDate = prefs.getString(_keyLastAbsensiNotif) ?? '';
-      if (lastNotifDate == todayStr) return; // sudah notif hari ini
+      if (prefs.getString(_keyLastAbsensiNotif) == todayStr) return;
 
       final bulanStr = now.month.toString().padLeft(2, '0');
-      final url = Uri.parse(
-          'https://ortuconnect.pbltifnganjuk.com/api/admin/absensi.php?id_siswa=$idSiswa&bulan=${now.year}-$bulanStr');
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
-      final res = jsonDecode(response.body) as Map<String, dynamic>;
+      final res = await ApiService().getAbsensi(idSiswa, '${now.year}-$bulanStr');
+      if (res['success'] != true) return;
 
-      if (res['status'] != 'success') return;
+      final data = res['data'] as Map<String, dynamic>?;
+      final List<dynamic> absensiList = (data?['absensi'] as List<dynamic>?) ?? [];
 
-      final List<dynamic> riwayat = res['riwayat'] ?? [];
-      if (riwayat.isEmpty) return;
-
-      // Cari absensi hari ini
-      for (final item in riwayat) {
+      for (final item in absensiList) {
         if (item is! Map<String, dynamic>) continue;
-        final tanggal = item['tanggal']?.toString() ?? '';
-        if (tanggal != todayStr) continue;
+        if (item['tanggal']?.toString() != todayStr) continue;
 
         final status = item['status']?.toString().toUpperCase() ?? '';
+        String title = '', body = '';
 
-        String title = '';
-        String body = '';
-
-        if (status == 'ALPHA' || status == 'ALPA') {
+        if (status == 'ALPA' || status == 'ALPHA') {
           title = '⚠️ Ketidakhadiran Siswa';
-          body = '$namaSiswa tidak hadir di sekolah hari ini (Alpha).';
+          body  = '$namaSiswa tidak hadir di sekolah hari ini (Alpa).';
         } else if (status == 'SAKIT') {
           title = '🤒 Siswa Sakit';
-          body = '$namaSiswa tidak hadir hari ini karena sakit.';
+          body  = '$namaSiswa tidak hadir hari ini karena sakit.';
         } else if (status == 'IZIN') {
           title = '📋 Siswa Izin';
-          body = '$namaSiswa tidak hadir hari ini karena izin.';
-        } else if (status == 'HADIR') {
-          // Tidak perlu notifikasi kalau hadir
+          body  = '$namaSiswa tidak hadir hari ini karena izin.';
+        } else {
           await prefs.setString(_keyLastAbsensiNotif, todayStr);
           return;
         }
@@ -333,89 +302,47 @@ class NotificationService {
     if (idSiswa.isEmpty) return;
     try {
       final now = DateTime.now();
-
-      // Hanya jalankan di hari Jumat (weekday == 5)
       if (now.weekday != DateTime.friday) return;
 
-      // Hitung nomor minggu tahun ini sebagai key unik
       final weekKey = '${now.year}-W${_weekNumber(now)}';
-
       final prefs = await SharedPreferences.getInstance();
-      final lastWeek = prefs.getString(_keyLastRekapNotif) ?? '';
-      if (lastWeek == weekKey) return; // sudah notif minggu ini
+      if (prefs.getString(_keyLastRekapNotif) == weekKey) return;
 
-      // Ambil data absensi bulan ini
       final bulanStr = now.month.toString().padLeft(2, '0');
-      final url = Uri.parse(
-          'https://ortuconnect.pbltifnganjuk.com/api/admin/absensi.php?id_siswa=$idSiswa&bulan=${now.year}-$bulanStr');
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
-      final res = jsonDecode(response.body) as Map<String, dynamic>;
+      final res = await ApiService().getAbsensi(idSiswa, '${now.year}-$bulanStr');
+      if (res['success'] != true) return;
 
-      if (res['status'] != 'success') return;
+      final data = res['data'] as Map<String, dynamic>?;
+      // Gunakan rekap dari API jika tersedia
+      final rekap = data?['rekap'] as Map<String, dynamic>?;
+      if (rekap != null) {
+        final hadir = int.tryParse(rekap['Hadir']?.toString() ?? '0') ?? 0;
+        final alpha = int.tryParse(rekap['Alpa']?.toString() ?? '0') ?? 0;
+        final sakit = int.tryParse(rekap['Sakit']?.toString() ?? '0') ?? 0;
+        final izin  = int.tryParse(rekap['Izin']?.toString() ?? '0') ?? 0;
+        final total = int.tryParse(rekap['total']?.toString() ?? '0') ?? 0;
 
-      final List<dynamic> riwayat = res['riwayat'] ?? [];
-      if (riwayat.isEmpty) return;
+        if (total == 0) return;
 
-      // Hitung kehadiran minggu ini (Senin s/d Jumat)
-      final senin = now.subtract(Duration(days: now.weekday - 1));
-      final jumat = senin.add(const Duration(days: 4));
+        final sb = StringBuffer('Hadir: $hadir hari');
+        if (alpha > 0) sb.write(' | Alpa: $alpha');
+        if (sakit > 0) sb.write(' | Sakit: $sakit');
+        if (izin  > 0) sb.write(' | Izin: $izin');
 
-      int hadir = 0, alpha = 0, sakit = 0, izin = 0, totalHari = 0;
-
-      for (final item in riwayat) {
-        if (item is! Map<String, dynamic>) continue;
-        final tanggalStr = item['tanggal']?.toString() ?? '';
-        if (tanggalStr.isEmpty) continue;
-
-        DateTime? tgl;
-        try {
-          tgl = DateTime.parse(tanggalStr);
-        } catch (_) {
-          continue;
+        String title;
+        if (hadir == total) {
+          title = '🌟 Rekap Minggu Ini — $namaSiswa';
+          sb.write('\nKehadiran sempurna minggu ini!');
+        } else if (alpha > 0) {
+          title = '📊 Rekap Minggu Ini — $namaSiswa';
+          sb.write('\nAda ketidakhadiran tanpa keterangan.');
+        } else {
+          title = '📊 Rekap Minggu Ini — $namaSiswa';
         }
 
-        // Hanya hitung hari dalam minggu ini
-        final tglOnly = DateTime(tgl.year, tgl.month, tgl.day);
-        final seninOnly = DateTime(senin.year, senin.month, senin.day);
-        final jumatOnly = DateTime(jumat.year, jumat.month, jumat.day);
-
-        if (tglOnly.isBefore(seninOnly) || tglOnly.isAfter(jumatOnly)) continue;
-
-        totalHari++;
-        final status = item['status']?.toString().toUpperCase() ?? '';
-        if (status == 'HADIR') {
-          hadir++;
-        } else if (status == 'ALPHA' || status == 'ALPA') {
-          alpha++;
-        } else if (status == 'SAKIT') {
-          sakit++;
-        } else if (status == 'IZIN') {
-          izin++;
-        }
+        await showNotification(id: 300, title: title, body: sb.toString(), type: 'rekap');
+        await prefs.setString(_keyLastRekapNotif, weekKey);
       }
-
-      if (totalHari == 0) return;
-
-      // Susun pesan rekap
-      final StringBuffer body = StringBuffer();
-      body.write('Hadir: $hadir hari');
-      if (alpha > 0) body.write(' | Alpha: $alpha');
-      if (sakit > 0) body.write(' | Sakit: $sakit');
-      if (izin > 0) body.write(' | Izin: $izin');
-
-      String title;
-      if (hadir == totalHari) {
-        title = '🌟 Rekap Minggu Ini — $namaSiswa';
-        body.write('\nKehadiran sempurna minggu ini!');
-      } else if (alpha > 0) {
-        title = '📊 Rekap Minggu Ini — $namaSiswa';
-        body.write('\nAda ketidakhadiran tanpa keterangan.');
-      } else {
-        title = '📊 Rekap Minggu Ini — $namaSiswa';
-      }
-
-      await showNotification(id: 300, title: title, body: body.toString(), type: 'rekap');
-      await prefs.setString(_keyLastRekapNotif, weekKey);
     } catch (e) {
       // Silent fail
     }

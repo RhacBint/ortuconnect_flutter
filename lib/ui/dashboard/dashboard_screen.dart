@@ -1,10 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../login/login_screen.dart';
-import '../../core/session_manager.dart';
+import '../../core/api_service.dart';
 import '../../core/notification_service.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -15,29 +13,24 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
-  static const String _apiDashboard =
-      'https://ortuconnect.pbltifnganjuk.com/api/dashboard.php?id_siswa=';
-  static const String _apiProfile =
-      'https://ortuconnect.pbltifnganjuk.com/api/profile.php?username=';
-
   bool _isLoading = true;
   String? _errorMessage;
 
   String _namaSiswa = '';
   String _kelas = '';
+  String _fotoUrl = '';
   String _genderIcon = 'cowo';
   String _agendaTitle = 'Tidak ada agenda/pengumuman';
   String _agendaDate = '';
   String _kehadiranStatus = 'Data kehadiran tidak tersedia';
   String _izinStatus = 'Belum ada izin terbaru';
-  String _username = '';
   String _idSiswa = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadFromSession();
+    _loadDashboard();
   }
 
   @override
@@ -49,106 +42,57 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _loadFromSession();
-      if (_username.isNotEmpty) {
-        NotificationService().checkAll(_username);
-        if (_idSiswa.isNotEmpty) {
-          NotificationService().checkAbsensiHariIni(_idSiswa, _namaSiswa);
-          NotificationService().checkRekapMingguan(_idSiswa, _namaSiswa);
-        }
+      _loadDashboard();
+      if (_idSiswa.isNotEmpty) {
+        NotificationService().checkAll(_idSiswa);
+        NotificationService().checkAbsensiHariIni(_idSiswa, _namaSiswa);
+        NotificationService().checkRekapMingguan(_idSiswa, _namaSiswa);
       }
-    }
-  }
-
-  Future<void> _loadFromSession() async {
-    if (mounted) setState(() => _isLoading = true);
-
-    final prefs = await SharedPreferences.getInstance();
-    _username = prefs.getString('username') ?? '';
-    _idSiswa = prefs.getString('id_siswa') ?? '';
-    _genderIcon = prefs.getString('profile_gender_icon') ?? 'cowo';
-
-    // Debug: tampilkan FCM token di console
-    final fcmToken = prefs.getString('fcm_token') ?? '';
-    if (fcmToken.isNotEmpty) {
-      debugPrint('=== FCM TOKEN ===');
-      debugPrint(fcmToken);
-      debugPrint('================');
-    }
-
-    if (_username.isEmpty) {
-      _logout();
-      return;
-    }
-
-    if (_idSiswa.isEmpty) {
-      await _loadProfileFirst();
-    } else {
-      await _loadDashboard();
-    }
-  }
-
-  Future<void> _loadProfileFirst() async {
-    try {
-      final response = await http
-          .get(Uri.parse('$_apiProfile$_username'))
-          .timeout(const Duration(seconds: 15));
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-
-      if (data['success'] == true) {
-        final profileData = data['data'] as Map<String, dynamic>;
-        _idSiswa = profileData['id_siswa']?.toString() ?? '';
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('id_siswa', _idSiswa);
-        final gender = profileData['gender']?.toString().toLowerCase() ?? '';
-        _genderIcon = gender.contains('perempuan') ? 'cewe' : 'cowo';
-        await prefs.setString('profile_gender_icon', _genderIcon);
-        if (_idSiswa.isNotEmpty) {
-          await _loadDashboard();
-        } else {
-          _setError('ID Siswa tidak ditemukan di profil');
-        }
-      } else {
-        _setError('Profil tidak aktif atau tidak ditemukan');
-        _logout();
-      }
-    } catch (e) {
-      _setError('Koneksi terganggu. Tarik ke bawah untuk refresh.');
     }
   }
 
   Future<void> _loadDashboard() async {
-    try {
-      final response = await http
-          .get(Uri.parse('$_apiDashboard$_idSiswa'))
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) {
-        _setError('Server Error (${response.statusCode})');
-        return;
-      }
+    if (mounted) setState(() => _isLoading = true);
 
-      final res = jsonDecode(response.body) as Map<String, dynamic>;
-      if (res['status'] != 'success') {
+    try {
+      // Ambil id_siswa dari session
+      final prefs = await SharedPreferences.getInstance();
+      _idSiswa = prefs.getString('id_siswa') ?? '';
+      _genderIcon = prefs.getString('profile_gender_icon') ?? 'cowo';
+
+      final res = await ApiService().getDashboard(_idSiswa);
+
+      if (res['success'] != true) {
         _setError(res['message']?.toString() ?? 'Gagal mengambil data');
         return;
       }
 
-      if (res['profil'] is Map) {
-        final p = res['profil'] as Map<String, dynamic>;
-        _namaSiswa = p['nama_siswa']?.toString() ?? 'Nama tidak tersedia';
-        _kelas = p['kelas']?.toString() ?? 'Kelas tidak tersedia';
+      final data = res['data'] as Map<String, dynamic>;
+
+      // Profil
+      if (data['profil'] is Map) {
+        final p = data['profil'] as Map<String, dynamic>;
+        _namaSiswa = p['nama_siswa']?.toString() ?? '';
+        _kelas     = p['kelas']?.toString() ?? '';
+        _fotoUrl   = ApiService.photoUrl(p['foto']?.toString());
+        _idSiswa   = p['id_siswa']?.toString() ?? _idSiswa;
       }
 
-      _parseAgenda(res);
+      // Agenda mendatang
+      _parseAgenda(data['agenda_mendatang']);
 
-      if (res.containsKey('kehadiran_minggu_ini') && res['kehadiran_minggu_ini'] is Map) {
-        final k = res['kehadiran_minggu_ini'] as Map<String, dynamic>;
-        _kehadiranStatus = 'Hadir: ${k['hadir'] ?? '0'}/${k['total_hari'] ?? '5'} hari';
+      // Kehadiran minggu ini
+      if (data['kehadiran_minggu_ini'] is Map) {
+        final k = data['kehadiran_minggu_ini'] as Map<String, dynamic>;
+        final hadir = k['jumlah_hadir'] ?? k['hadir'] ?? '0';
+        final total = k['total_hari'] ?? '5';
+        _kehadiranStatus = 'Hadir: $hadir/$total hari';
       }
 
-      _parseIzin(res);
+      // Izin terbaru
+      _parseIzin(data['izin_terbaru']);
 
-      // Cek absensi hari ini setelah data profil tersedia
+      // Notifikasi
       if (_idSiswa.isNotEmpty && _namaSiswa.isNotEmpty) {
         NotificationService().checkAbsensiHariIni(_idSiswa, _namaSiswa);
         NotificationService().checkRekapMingguan(_idSiswa, _namaSiswa);
@@ -160,73 +104,73 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
           _errorMessage = null;
         });
       }
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) {
+        _logout();
+      } else {
+        _setError(e.message);
+      }
     } catch (e) {
-      _setError('Gagal memuat dashboard: $e');
+      _setError('Gagal memuat dashboard. Tarik ke bawah untuk refresh.');
     }
   }
 
-  void _parseAgenda(Map<String, dynamic> res) {
+  void _parseAgenda(dynamic raw) {
     _agendaTitle = 'Tidak ada agenda/pengumuman';
-    _agendaDate = '';
-    if (!res.containsKey('agenda') || res['agenda'] == null) return;
+    _agendaDate  = '';
+    if (raw == null) return;
 
-    // API bisa mengembalikan List atau Map — normalise ke List
-    final raw = res['agenda'];
-    List<dynamic> agendaList;
+    List<dynamic> list;
     if (raw is List) {
-      agendaList = raw;
+      list = raw;
     } else if (raw is Map) {
-      agendaList = raw.values.toList();
+      list = raw.values.toList();
     } else {
       return;
     }
-    if (agendaList.isEmpty) return;
+    if (list.isEmpty) return;
 
     final now = DateTime.now();
-    Map<String, dynamic>? upcomingAgenda;
-    Duration? closestDiff;
+    Map<String, dynamic>? upcoming;
+    Duration? closest;
 
-    for (final item in agendaList) {
+    for (final item in list) {
       if (item is! Map<String, dynamic>) continue;
-      final agenda = item;
-      final dateStr = agenda['tanggal']?.toString() ?? '';
+      final dateStr = item['tanggal']?.toString() ?? '';
       if (dateStr.isEmpty) continue;
-      final agendaTime = _parseDate(dateStr);
-      if (agendaTime == null) continue;
-      if (!agendaTime.isBefore(DateTime(now.year, now.month, now.day))) {
-        final diff = agendaTime.difference(now);
-        if (closestDiff == null || diff < closestDiff) {
-          closestDiff = diff;
-          upcomingAgenda = agenda;
+      final dt = _parseDate(dateStr);
+      if (dt == null) continue;
+      if (!dt.isBefore(DateTime(now.year, now.month, now.day))) {
+        final diff = dt.difference(now);
+        if (closest == null || diff < closest) {
+          closest = diff;
+          upcoming = item;
         }
       }
     }
 
-    if (upcomingAgenda != null) {
-      _agendaTitle = upcomingAgenda['nama_kegiatan']?.toString() ?? 'Kegiatan';
-      _agendaDate = _formatTanggal(upcomingAgenda['tanggal']?.toString() ?? '');
+    if (upcoming != null) {
+      _agendaTitle = upcoming['nama_kegiatan']?.toString() ?? 'Kegiatan';
+      _agendaDate  = _formatTanggal(upcoming['tanggal']?.toString() ?? '');
     }
   }
 
-  void _parseIzin(Map<String, dynamic> res) {
+  void _parseIzin(dynamic raw) {
     _izinStatus = 'Belum ada izin terbaru';
-    if (!res.containsKey('izin_terbaru') || res['izin_terbaru'] == null) return;
+    if (raw == null) return;
 
-    final rawIzin = res['izin_terbaru'];
-    Map<String, dynamic>? latestIzin;
-
-    if (rawIzin is Map<String, dynamic>) {
-      latestIzin = rawIzin;
-    } else if (rawIzin is List && rawIzin.isNotEmpty) {
-      final first = rawIzin.first;
-      if (first is Map<String, dynamic>) latestIzin = first;
+    Map<String, dynamic>? izin;
+    if (raw is Map<String, dynamic>) {
+      izin = raw;
+    } else if (raw is List && raw.isNotEmpty && raw.first is Map<String, dynamic>) {
+      izin = raw.first as Map<String, dynamic>;
     }
 
-    if (latestIzin != null) {
-      final status = latestIzin['status']?.toString() ?? 'Pending';
-      final jenis = latestIzin['jenis_izin']?.toString() ?? '';
-      final tgl = latestIzin['tanggal_pengajuan']?.toString() ?? '';
-      final sb = StringBuffer(status.isEmpty ? 'Pending' : status);
+    if (izin != null) {
+      final status = izin['status']?.toString() ?? 'Menunggu';
+      final jenis  = izin['jenis_izin']?.toString() ?? '';
+      final tgl    = izin['tanggal_pengajuan']?.toString() ?? '';
+      final sb = StringBuffer(status.isEmpty ? 'Menunggu' : status);
       if (jenis.isNotEmpty) sb.write(' ($jenis)');
       if (tgl.isNotEmpty && !tgl.contains('0000')) {
         sb.write('\n${_formatTanggal(tgl.split(' ')[0])}');
@@ -235,48 +179,34 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     }
   }
 
-  DateTime? _parseDate(String dateStr) {
-    final formats = ['yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd', 'dd-MM-yyyy'];
-    for (final f in formats) {
-      try {
-        return DateFormat(f).parse(dateStr);
-      } catch (_) {}
+  DateTime? _parseDate(String s) {
+    for (final f in ['yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd', 'dd-MM-yyyy']) {
+      try { return DateFormat(f).parse(s); } catch (_) {}
     }
     return null;
   }
 
-  String _formatTanggal(String tanggal) {
+  String _formatTanggal(String s) {
     try {
-      final date = DateFormat('yyyy-MM-dd').parse(tanggal.trim());
-      return DateFormat('dd MMMM yyyy', 'id_ID').format(date);
-    } catch (_) {
-      return tanggal;
-    }
+      return DateFormat('dd MMMM yyyy', 'id_ID').format(DateFormat('yyyy-MM-dd').parse(s.trim()));
+    } catch (_) { return s; }
   }
 
   void _setError(String msg) {
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = msg;
-      });
-    }
+    if (mounted) setState(() { _isLoading = false; _errorMessage = msg; });
   }
 
   Future<void> _logout() async {
-    await SessionManager().logoutUser();
+    await ApiService().logout();
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
   }
 
-  Future<void> _refreshDatabase() async {
-    await _loadFromSession();
-  }
+  // ─── Build ────────────────────────────────────────────────────────────────
 
-  // ---------------- Build ----------------
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -307,7 +237,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
             ),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: _refreshDatabase,
+                onRefresh: _loadDashboard,
                 color: const Color(0xFF68327E),
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator(color: Colors.white))
@@ -333,13 +263,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
             children: [
               const Icon(Icons.info_outline, color: Colors.white70, size: 48),
               const SizedBox(height: 16),
-              Text(
-                _errorMessage!,
-                style: const TextStyle(color: Colors.white70),
-                textAlign: TextAlign.center,
-              ),
+              Text(_errorMessage!, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
               TextButton(
-                onPressed: _refreshDatabase,
+                onPressed: _loadDashboard,
                 child: const Text('Coba Lagi', style: TextStyle(color: Colors.white)),
               ),
             ],
@@ -369,6 +295,10 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Widget _buildProfileCard() {
+    final String genderAsset = _genderIcon == 'cewe'
+        ? 'assets/images/icon_cewe.png'
+        : 'assets/images/icon_cowo.png';
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -387,11 +317,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         children: [
           CircleAvatar(
             radius: 32,
-            backgroundImage: AssetImage(
-              _genderIcon == 'cewe'
-                  ? 'assets/images/icon_cewe.png'
-                  : 'assets/images/icon_cowo.png',
-            ),
+            backgroundImage: _fotoUrl.isNotEmpty
+                ? NetworkImage(_fotoUrl) as ImageProvider
+                : AssetImage(genderAsset),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -430,20 +358,11 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _agendaTitle,
-            style: const TextStyle(
-              color: Color(0xFF68327E),
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text(_agendaTitle,
+              style: const TextStyle(color: Color(0xFF68327E), fontSize: 15, fontWeight: FontWeight.bold)),
           if (_agendaDate.isNotEmpty) ...[
             const SizedBox(height: 3),
-            Text(
-              _agendaDate,
-              style: const TextStyle(color: Color(0xFF0F53BF), fontSize: 13),
-            ),
+            Text(_agendaDate, style: const TextStyle(color: Color(0xFF0F53BF), fontSize: 13)),
           ],
         ],
       ),
@@ -454,14 +373,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     return _cardWrapper(
       assetIcon: 'assets/images/ic_absensi.png',
       label: 'Kehadiran Minggu Ini',
-      child: Text(
-        _kehadiranStatus,
-        style: const TextStyle(
-          color: Color(0xFF68327E),
-          fontSize: 15,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      child: Text(_kehadiranStatus,
+          style: const TextStyle(color: Color(0xFF68327E), fontSize: 15, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -469,22 +382,12 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     return _cardWrapper(
       assetIcon: 'assets/images/ic_perizinan.png',
       label: 'Status Izin Terbaru',
-      child: Text(
-        _izinStatus,
-        style: const TextStyle(
-          color: Color(0xFF68327E),
-          fontSize: 15,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      child: Text(_izinStatus,
+          style: const TextStyle(color: Color(0xFF68327E), fontSize: 15, fontWeight: FontWeight.bold)),
     );
   }
 
-  Widget _cardWrapper({
-    required Widget child,
-    required String assetIcon,
-    required String label,
-  }) {
+  Widget _cardWrapper({required Widget child, required String assetIcon, required String label}) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -508,15 +411,10 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.black45,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
-                  ),
-                ),
+                Text(label,
+                    style: const TextStyle(
+                        color: Colors.black45, fontSize: 11,
+                        fontWeight: FontWeight.w600, letterSpacing: 0.4)),
                 const SizedBox(height: 4),
                 child,
               ],

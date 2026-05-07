@@ -1,6 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/api_service.dart';
 import '../../core/session_manager.dart';
 import '../../core/notification_service.dart';
 import '../main/main_screen.dart';
@@ -15,9 +16,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
-  static const String _apiLogin =
-      'https://ortuconnect.pbltifnganjuk.com/api/login.php';
 
   bool _isLoading = false;
   bool _passwordVisible = false;
@@ -71,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   }
 
   Future<void> _handleLogin() async {
-    final username = _usernameController.text;
+    final username = _usernameController.text.trim();
     final password = _passwordController.text;
 
     if (username.isEmpty || password.isEmpty) {
@@ -82,34 +80,39 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     setState(() => _isLoading = true);
 
     try {
-      final response = await http
-          .post(
-            Uri.parse(_apiLogin),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'username': username, 'password': password}),
-          )
-          .timeout(const Duration(seconds: 30));
-
-      debugPrint('Login response code: ${response.statusCode}');
-      debugPrint('Login response body: ${response.body}');
-
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final success = data['success'] == true;
+      final res = await ApiService().login(username, password);
 
       if (!mounted) return;
 
-      if (success) {
-        final user = data['user'] as Map<String, dynamic>;
+      if (res['success'] == true) {
+        final data = res['data'] as Map<String, dynamic>;
+
+        // Cek role — hanya ortu yang boleh login di mobile
+        if (data['role']?.toString() != 'ortu') {
+          _showToast('Akses ditolak. Hanya orang tua yang dapat login.');
+          return;
+        }
+
+        final idSiswa = data['id_siswa']?.toString() ?? '';
+        final gender  = data['siswa']?['gender']?.toString().toLowerCase() ?? '';
+
         await SessionManager().createLoginSession(
-          user['username'].toString(),
-          user['id_akun'].toString(),
-          user['role'].toString(),
+          token:    data['token'].toString(),
+          username: data['username'].toString(),
+          userId:   data['id_akun'].toString(),
+          role:     data['role'].toString(),
+          idSiswa:  idSiswa,
         );
 
-        // Kirim FCM token ke server setelah login berhasil
+        // Simpan gender icon untuk avatar
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('profile_gender_icon',
+            gender.contains('perempuan') ? 'cewe' : 'cowo');
+
+        // Kirim FCM token ke server
         final fcmToken = await NotificationService().getFcmToken();
         if (fcmToken != null && fcmToken.isNotEmpty) {
-          _sendFcmTokenToServer(username, fcmToken);
+          ApiService().saveFcmToken(fcmToken);
         }
 
         if (!mounted) return;
@@ -123,30 +126,18 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           ),
         );
       } else {
-        _showToast(data['message']?.toString() ?? 'Username atau password salah');
+        _showToast(res['message']?.toString() ?? 'Username atau password salah');
       }
+    } on ApiException catch (e) {
+      _showToast(e.message);
     } on http.ClientException {
       _showToast('Tidak ada koneksi internet');
     } catch (e) {
-      debugPrint('Login exception type: ${e.runtimeType}');
-      debugPrint('Login exception detail: $e');
-      _showToast('Error: $e');
+      debugPrint('Login error: $e');
+      _showToast('Terjadi kesalahan. Coba lagi.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  // Kirim FCM token ke server (fire and forget, tidak perlu tunggu)
-  void _sendFcmTokenToServer(String username, String fcmToken) {
-    http.post(
-      Uri.parse('https://ortuconnect.pbltifnganjuk.com/api/save_fcm_token.php'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'username': username, 'fcm_token': fcmToken}),
-    ).timeout(const Duration(seconds: 10)).then((response) {
-      debugPrint('FCM token sent: ${response.body}');
-    }).catchError((e) {
-      debugPrint('FCM token send failed: $e');
-    });
   }
 
   void _showToast(String message) {

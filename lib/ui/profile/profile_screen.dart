@@ -1,9 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/api_service.dart';
 import '../../core/session_manager.dart';
 import '../login/login_screen.dart';
 
@@ -15,57 +14,55 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final String baseUrl = "https://ortuconnect.pbltifnganjuk.com/api/profile.php";
-  final String uploadUrl = "https://ortuconnect.pbltifnganjuk.com/api/upload_photo.php";
+  static const String _keyPhotoUrl = 'profile_photo_url';
 
   bool isLoading = true;
   bool _isUploadingPhoto = false;
   Map<String, dynamic>? profileData;
-  String? username;
   String _photoUrl = '';
-
-  static const String _keyPhotoUrl = 'profile_photo_url';
 
   @override
   void initState() {
     super.initState();
-    _loadUsernameAndData();
+    _loadProfile();
   }
 
-  Future<void> _loadUsernameAndData() async {
-    username = await SessionManager().getUsername();
+  Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
     _photoUrl = prefs.getString(_keyPhotoUrl) ?? '';
-    if (username != null && username!.isNotEmpty) {
-      await _fetchProfileData();
-    } else {
-      if (mounted) setState(() => isLoading = false);
-    }
-  }
-
-  Future<void> _fetchProfileData() async {
     try {
-      final response = await http.get(Uri.parse("$baseUrl?username=$username"));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success']) {
-          // Cek apakah server mengembalikan photo_url
-          final serverPhoto = data['data']?['photo_url']?.toString() ?? '';
-          if (serverPhoto.isNotEmpty) {
-            _photoUrl = serverPhoto;
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString(_keyPhotoUrl, serverPhoto);
-          }
-          if (mounted) {
-            setState(() {
-              profileData = data['data'];
-              isLoading = false;
-            });
-          }
+      final res = await ApiService().getProfile();
+      if (res['success'] == true) {
+        final data = res['data'] as Map<String, dynamic>;
+        // Foto dari server
+        final serverFoto = data['foto']?.toString() ?? '';
+        if (serverFoto.isNotEmpty) {
+          _photoUrl = ApiService.photoUrl(serverFoto);
+          await prefs.setString(_keyPhotoUrl, _photoUrl);
         }
+        // Simpan gender icon
+        final gender = data['gender']?.toString().toLowerCase() ?? '';
+        await prefs.setString('profile_gender_icon',
+            gender.contains('perempuan') ? 'cewe' : 'cowo');
+
+        if (mounted) setState(() { profileData = data; isLoading = false; });
+      } else {
+        if (mounted) setState(() => isLoading = false);
+      }
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) {
+        await SessionManager().logoutUser();
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        }
+      } else {
+        if (mounted) setState(() => isLoading = false);
       }
     } catch (e) {
-      debugPrint("Error fetching profile: $e");
+      debugPrint('Error fetching profile: $e');
       if (mounted) setState(() => isLoading = false);
     }
   }
@@ -137,35 +134,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isUploadingPhoto = true);
 
     try {
-      final request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
-      request.fields['username'] = username ?? '';
-      request.files.add(await http.MultipartFile.fromPath('photo', picked.path));
-
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        if (data['success'] == true) {
-          final newUrl = data['photo_url']?.toString() ?? '';
-          if (newUrl.isNotEmpty) {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString(_keyPhotoUrl, newUrl);
-            if (mounted) setState(() => _photoUrl = newUrl);
-          }
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Foto profil berhasil diperbarui')),
-            );
-          }
-        } else {
-          _showError(data['message']?.toString() ?? 'Gagal upload foto');
+      final res = await ApiService().uploadPhoto(picked.path);
+      if (res['success'] == true) {
+        final data = res['data'] as Map<String, dynamic>?;
+        final newFoto = data?['foto']?.toString() ?? '';
+        if (newFoto.isNotEmpty) {
+          final newUrl = ApiService.photoUrl(newFoto);
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_keyPhotoUrl, newUrl);
+          if (mounted) setState(() => _photoUrl = newUrl);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Foto profil berhasil diperbarui')),
+          );
         }
       } else {
-        _showError('Server error: ${response.statusCode}');
+        _showError(res['message']?.toString() ?? 'Gagal upload foto');
       }
+    } on ApiException catch (e) {
+      _showError(e.message);
     } catch (e) {
-      _showError('Gagal upload foto: $e');
+      _showError('Gagal upload foto');
     } finally {
       if (mounted) setState(() => _isUploadingPhoto = false);
     }
@@ -181,27 +171,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _updateProfile(Map<String, String> updatedData) async {
     setState(() => isLoading = true);
     try {
-      final response = await http.post(
-        Uri.parse(baseUrl),
-        body: {'username': username, ...updatedData},
-      );
-      if (response.statusCode == 200) {
-        String serverMessage = 'Berhasil update profil';
-        try {
-          final resBody = json.decode(response.body) as Map<String, dynamic>;
-          if (resBody['success'] == true) {
-            serverMessage = resBody['message']?.toString() ?? 'Berhasil update profil';
-          } else {
-            final errMsg = resBody['message']?.toString() ?? 'Gagal update profil';
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(errMsg), backgroundColor: Colors.red),
-              );
-            }
-            return;
-          }
-        } catch (_) {}
-
+      final res = await ApiService().updateProfile(updatedData);
+      if (res['success'] == true) {
         final newGender = updatedData['gender'] ?? '';
         if (newGender.isNotEmpty) {
           final prefs = await SharedPreferences.getInstance();
@@ -210,24 +181,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(serverMessage)),
+            SnackBar(content: Text(res['message']?.toString() ?? 'Berhasil update profil')),
           );
         }
-        await _fetchProfileData();
+        await _loadProfile();
       } else {
-        String errMsg = 'Gagal update (${response.statusCode})';
-        try {
-          final resBody = json.decode(response.body) as Map<String, dynamic>;
-          errMsg = resBody['message']?.toString() ?? errMsg;
-        } catch (_) {}
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errMsg), backgroundColor: Colors.red),
+            SnackBar(content: Text(res['message']?.toString() ?? 'Gagal update profil'),
+                backgroundColor: Colors.red),
           );
         }
       }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        );
+      }
     } catch (e) {
-      debugPrint("Error updating profile: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Terjadi kesalahan koneksi'), backgroundColor: Colors.red),
@@ -337,7 +309,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Tidak")),
           TextButton(
             onPressed: () async {
-              await SessionManager().logoutUser();
+              Navigator.pop(context);
+              await ApiService().logout();
               if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
