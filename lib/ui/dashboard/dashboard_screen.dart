@@ -43,11 +43,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadDashboard();
-      if (_idSiswa.isNotEmpty) {
-        NotificationService().checkAll(_idSiswa);
-        NotificationService().checkAbsensiHariIni(_idSiswa, _namaSiswa);
-        NotificationService().checkRekapMingguan(_idSiswa, _namaSiswa);
-      }
     }
   }
 
@@ -92,11 +87,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       // Izin terbaru
       _parseIzin(data['izin_terbaru']);
 
-      // Notifikasi
-      if (_idSiswa.isNotEmpty && _namaSiswa.isNotEmpty) {
-        NotificationService().checkAbsensiHariIni(_idSiswa, _namaSiswa);
-        NotificationService().checkRekapMingguan(_idSiswa, _namaSiswa);
-      }
 
       if (mounted) {
         setState(() {

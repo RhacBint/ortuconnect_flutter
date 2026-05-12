@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Satu tempat untuk semua konfigurasi dan request ke Laravel API
 class ApiService {
-  // URL Laravel API yang sudah di-deploy
+  // URL Laravel API production (Hostinger)
   static const String baseUrl = 'https://ortuconnect.pbltifnganjuk.com/api';
 
   static const String _keyToken    = 'auth_token';
@@ -240,10 +240,27 @@ class ApiService {
   /// Foto URL lengkap dari path relatif server
   static String photoUrl(String? relativePath) {
     if (relativePath == null || relativePath.isEmpty) return '';
-    if (relativePath.startsWith('http')) return relativePath;
-    // baseUrl = http://127.0.0.1:8000/api → ambil origin saja
-    final origin = baseUrl.replaceFirst('/api', '');
-    return '$origin$relativePath';
+
+    String finalUrl = '';
+
+    // Jika sudah full URL (berawalan http)
+    if (relativePath.startsWith('http')) {
+      // Pastikan menggunakan https jika baseUrl menggunakan https untuk menghindari 'Mixed Content'
+      if (baseUrl.startsWith('https://') && relativePath.startsWith('http://')) {
+        finalUrl = relativePath.replaceFirst('http://', 'https://');
+      } else {
+        finalUrl = relativePath;
+      }
+    } else {
+      // Jika path relatif, gabungkan dengan origin dari baseUrl
+      final origin = baseUrl.replaceFirst('/api', '');
+      String cleanPath = relativePath.startsWith('/') ? relativePath : '/$relativePath';
+      finalUrl = '$origin$cleanPath';
+    }
+
+    // Tambahkan timestamp sebagai cache buster agar foto langsung berubah saat diupdate
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return finalUrl.contains('?') ? '$finalUrl&t=$timestamp' : '$finalUrl?t=$timestamp';
   }
 }
 
