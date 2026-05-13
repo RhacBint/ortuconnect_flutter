@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../login/login_screen.dart';
 import '../../core/api_service.dart';
-import '../../core/notification_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -12,7 +11,8 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
+class _DashboardScreenState extends State<DashboardScreen>
+    with WidgetsBindingObserver {
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -68,9 +68,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       if (data['profil'] is Map) {
         final p = data['profil'] as Map<String, dynamic>;
         _namaSiswa = p['nama_siswa']?.toString() ?? '';
-        _kelas     = p['kelas']?.toString() ?? '';
-        _fotoUrl   = ApiService.photoUrl(p['foto']?.toString());
-        _idSiswa   = p['id_siswa']?.toString() ?? _idSiswa;
+        _kelas = p['kelas']?.toString() ?? '';
+        _fotoUrl = ApiService.photoUrl(p['foto']?.toString());
+        _idSiswa = p['id_siswa']?.toString() ?? _idSiswa;
       }
 
       // Agenda mendatang
@@ -86,7 +86,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
       // Izin terbaru
       _parseIzin(data['izin_terbaru']);
-
 
       if (mounted) {
         setState(() {
@@ -107,7 +106,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
   void _parseAgenda(dynamic raw) {
     _agendaTitle = 'Tidak ada agenda/pengumuman';
-    _agendaDate  = '';
+    _agendaDate = '';
     if (raw == null) return;
 
     List<dynamic> list;
@@ -141,7 +140,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
     if (upcoming != null) {
       _agendaTitle = upcoming['nama_kegiatan']?.toString() ?? 'Kegiatan';
-      _agendaDate  = _formatTanggal(upcoming['tanggal']?.toString() ?? '');
+      _agendaDate = _formatTanggal(upcoming['tanggal']?.toString() ?? '');
     }
   }
 
@@ -152,14 +151,16 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     Map<String, dynamic>? izin;
     if (raw is Map<String, dynamic>) {
       izin = raw;
-    } else if (raw is List && raw.isNotEmpty && raw.first is Map<String, dynamic>) {
+    } else if (raw is List &&
+        raw.isNotEmpty &&
+        raw.first is Map<String, dynamic>) {
       izin = raw.first as Map<String, dynamic>;
     }
 
     if (izin != null) {
       final status = izin['status']?.toString() ?? 'Menunggu';
-      final jenis  = izin['jenis_izin']?.toString() ?? '';
-      final tgl    = izin['tanggal_pengajuan']?.toString() ?? '';
+      final jenis = izin['jenis_izin']?.toString() ?? '';
+      final tgl = izin['tanggal_pengajuan']?.toString() ?? '';
       final sb = StringBuffer(status.isEmpty ? 'Menunggu' : status);
       if (jenis.isNotEmpty) sb.write(' ($jenis)');
       if (tgl.isNotEmpty && !tgl.contains('0000')) {
@@ -171,19 +172,30 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
   DateTime? _parseDate(String s) {
     for (final f in ['yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd', 'dd-MM-yyyy']) {
-      try { return DateFormat(f).parse(s); } catch (_) {}
+      try {
+        return DateFormat(f).parse(s);
+      } catch (_) {}
     }
     return null;
   }
 
   String _formatTanggal(String s) {
     try {
-      return DateFormat('dd MMMM yyyy', 'id_ID').format(DateFormat('yyyy-MM-dd').parse(s.trim()));
-    } catch (_) { return s; }
+      return DateFormat(
+        'dd MMMM yyyy',
+        'id_ID',
+      ).format(DateFormat('yyyy-MM-dd').parse(s.trim()));
+    } catch (_) {
+      return s;
+    }
   }
 
   void _setError(String msg) {
-    if (mounted) setState(() { _isLoading = false; _errorMessage = msg; });
+    if (mounted)
+      setState(() {
+        _isLoading = false;
+        _errorMessage = msg;
+      });
   }
 
   Future<void> _logout() async {
@@ -230,10 +242,12 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                 onRefresh: _loadDashboard,
                 color: const Color(0xFF68327E),
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                    ? const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      )
                     : _errorMessage != null
-                        ? _buildErrorView()
-                        : _buildContent(),
+                    ? _buildErrorView()
+                    : _buildContent(),
               ),
             ),
           ],
@@ -253,10 +267,17 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
             children: [
               const Icon(Icons.info_outline, color: Colors.white70, size: 48),
               const SizedBox(height: 16),
-              Text(_errorMessage!, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
               TextButton(
                 onPressed: _loadDashboard,
-                child: const Text('Coba Lagi', style: TextStyle(color: Colors.white)),
+                child: const Text(
+                  'Coba Lagi',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -348,11 +369,20 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_agendaTitle,
-              style: const TextStyle(color: Color(0xFF68327E), fontSize: 15, fontWeight: FontWeight.bold)),
+          Text(
+            _agendaTitle,
+            style: const TextStyle(
+              color: Color(0xFF68327E),
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           if (_agendaDate.isNotEmpty) ...[
             const SizedBox(height: 3),
-            Text(_agendaDate, style: const TextStyle(color: Color(0xFF0F53BF), fontSize: 13)),
+            Text(
+              _agendaDate,
+              style: const TextStyle(color: Color(0xFF0F53BF), fontSize: 13),
+            ),
           ],
         ],
       ),
@@ -363,8 +393,14 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     return _cardWrapper(
       assetIcon: 'assets/images/ic_absensi.png',
       label: 'Kehadiran Minggu Ini',
-      child: Text(_kehadiranStatus,
-          style: const TextStyle(color: Color(0xFF68327E), fontSize: 15, fontWeight: FontWeight.bold)),
+      child: Text(
+        _kehadiranStatus,
+        style: const TextStyle(
+          color: Color(0xFF68327E),
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
@@ -372,12 +408,22 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     return _cardWrapper(
       assetIcon: 'assets/images/ic_perizinan.png',
       label: 'Status Izin Terbaru',
-      child: Text(_izinStatus,
-          style: const TextStyle(color: Color(0xFF68327E), fontSize: 15, fontWeight: FontWeight.bold)),
+      child: Text(
+        _izinStatus,
+        style: const TextStyle(
+          color: Color(0xFF68327E),
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
-  Widget _cardWrapper({required Widget child, required String assetIcon, required String label}) {
+  Widget _cardWrapper({
+    required Widget child,
+    required String assetIcon,
+    required String label,
+  }) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -401,10 +447,15 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: const TextStyle(
-                        color: Colors.black45, fontSize: 11,
-                        fontWeight: FontWeight.w600, letterSpacing: 0.4)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.black45,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.4,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 child,
               ],
