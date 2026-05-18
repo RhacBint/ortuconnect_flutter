@@ -9,6 +9,18 @@ import 'api_service.dart';
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('FCM background message: ${message.messageId}');
+  
+  final notification = message.notification;
+  if (notification != null) {
+    // Simpan ke riwayat notifikasi lokal (Database)
+    await NotificationDatabase().insert(NotificationItem(
+      title: notification.title ?? 'Pesan Baru',
+      body: notification.body ?? '',
+      type: message.data['type']?.toString() ?? 'fcm',
+      timestamp: DateTime.now(),
+    ));
+    debugPrint('FCM background message saved to database');
+  }
 }
 
 class NotificationService {
@@ -144,7 +156,6 @@ class NotificationService {
       importance: Importance.high,
       priority: Priority.high,
       showWhen: true,
-      sound: RawResourceAndroidNotificationSound('notification_sound'), // Opsional: jika ada sound custom
       playSound: true,
     );
     const NotificationDetails details =

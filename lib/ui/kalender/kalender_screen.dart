@@ -1,23 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../../core/app_theme.dart';
 import '../../core/api_service.dart';
 
 class AgendaItem {
   final String namaKegiatan;
   final String tanggal;
   final String deskripsi;
-
-  AgendaItem({
-    required this.namaKegiatan,
-    required this.tanggal,
-    required this.deskripsi,
-  });
+  AgendaItem({required this.namaKegiatan, required this.tanggal, required this.deskripsi});
 }
 
 class KalenderScreen extends StatefulWidget {
   const KalenderScreen({super.key});
-
   @override
   State<KalenderScreen> createState() => _KalenderScreenState();
 }
@@ -25,7 +20,6 @@ class KalenderScreen extends StatefulWidget {
 class _KalenderScreenState extends State<KalenderScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-
   bool _isLoading = false;
   String _errorMessage = '';
   List<AgendaItem> _agendaList = [];
@@ -39,41 +33,29 @@ class _KalenderScreenState extends State<KalenderScreen> {
 
   Future<void> _fetchAgenda(int month, int year) async {
     setState(() { _isLoading = true; _errorMessage = ''; });
-
     try {
       final res = await ApiService().getAgenda(month, year);
-
       if (res['success'] == true) {
         final raw = res['data'];
         List<dynamic> data = [];
-        if (raw is Map) {
-          data = (raw['agenda'] as List<dynamic>?) ?? [];
-        } else if (raw is List) {
-          data = raw;
-        }
+        if (raw is Map) { data = (raw['agenda'] as List<dynamic>?) ?? []; }
+        else if (raw is List) { data = raw; }
 
-        List<AgendaItem> tempList = data.map((obj) {
-          return AgendaItem(
-            namaKegiatan: obj['nama_kegiatan']?.toString() ?? 'Tanpa Judul',
-            tanggal:      obj['tanggal']?.toString() ?? '',
-            deskripsi:    obj['deskripsi']?.toString() ?? '',
-          );
-        }).toList();
+        List<AgendaItem> tempList = data.map((obj) => AgendaItem(
+          namaKegiatan: obj['nama_kegiatan']?.toString() ?? 'Tanpa Judul',
+          tanggal: obj['tanggal']?.toString() ?? '',
+          deskripsi: obj['deskripsi']?.toString() ?? '',
+        )).toList();
 
-        // Filter: hanya hari ini ke depan
         final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
         tempList.removeWhere((item) {
-          try {
-            return DateFormat('yyyy-MM-dd').parse(item.tanggal).isBefore(today);
-          } catch (_) { return false; }
+          try { return DateFormat('yyyy-MM-dd').parse(item.tanggal).isBefore(today); }
+          catch (_) { return false; }
         });
-
-        // Sort ascending
         tempList.sort((a, b) {
-          try {
-            return DateFormat('yyyy-MM-dd').parse(a.tanggal)
-                .compareTo(DateFormat('yyyy-MM-dd').parse(b.tanggal));
-          } catch (_) { return 0; }
+          try { return DateFormat('yyyy-MM-dd').parse(a.tanggal)
+              .compareTo(DateFormat('yyyy-MM-dd').parse(b.tanggal)); }
+          catch (_) { return 0; }
         });
 
         setState(() {
@@ -87,136 +69,84 @@ class _KalenderScreenState extends State<KalenderScreen> {
       setState(() { _agendaList = []; _errorMessage = e.message; });
     } catch (e) {
       setState(() { _agendaList = []; _errorMessage = 'Gagal memuat agenda. Periksa koneksi.'; });
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    } finally { setState(() => _isLoading = false); }
   }
 
-  String _formatTanggal(String tanggalStr) {
-    try {
-      DateTime parsedDate = DateFormat("yyyy-MM-dd", "id_ID").parse(tanggalStr);
-      return DateFormat("dd MMMM yyyy", "id_ID").format(parsedDate);
-    } catch (e) {
-      return tanggalStr;
-    }
+  String _formatTanggal(String s) {
+    try { return DateFormat("dd MMMM yyyy", "id_ID").format(DateFormat("yyyy-MM-dd").parse(s)); }
+    catch (e) { return s; }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF007ABF), Color(0xFF45287F), Color(0xFF68327E)],
-        ),
-      ),
+    return DarkBackground(
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header — konsisten dengan halaman lain
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 22, 24, 12),
-              child: Text(
-                'Kalender Kegiatan',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.3,
-                ),
-              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 22, 24, 12),
+              child: Text('Kalender Kegiatan', style: AppTheme.heading1),
             ),
-
-            // Kalender
+            // Calendar
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+              child: GlassCard(
+                borderRadius: 20, padding: const EdgeInsets.only(bottom: 8),
+                glowShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 6))],
+                child: TableCalendar(
+                  firstDay: DateTime.utc(2000, 1, 1),
+                  lastDay: DateTime.utc(2050, 12, 31),
+                  focusedDay: _focusedDay, locale: 'id_ID',
+                  calendarFormat: CalendarFormat.month,
+                  availableCalendarFormats: const { CalendarFormat.month: 'Month' },
+                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() { _selectedDay = selectedDay; _focusedDay = focusedDay; });
+                  },
+                  onPageChanged: (focusedDay) {
+                    if (focusedDay.month != _focusedDay.month || focusedDay.year != _focusedDay.year) {
+                      _focusedDay = focusedDay;
+                      _fetchAgenda(focusedDay.month, focusedDay.year);
+                    }
+                  },
+                  calendarStyle: CalendarStyle(
+                    todayDecoration: const BoxDecoration(color: AppTheme.indigo, shape: BoxShape.circle),
+                    selectedDecoration: const BoxDecoration(color: AppTheme.accent, shape: BoxShape.circle),
+                    defaultTextStyle: AppTheme.body.copyWith(color: AppTheme.textPrimary),
+                    weekendTextStyle: AppTheme.body.copyWith(color: AppTheme.textSecondary),
+                    outsideTextStyle: AppTheme.body.copyWith(color: AppTheme.textMuted),
+                    todayTextStyle: AppTheme.body.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                    selectedTextStyle: AppTheme.body.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
-                ],
-              ),
-              child: TableCalendar(
-                firstDay: DateTime.utc(2000, 1, 1),
-                lastDay: DateTime.utc(2050, 12, 31),
-                focusedDay: _focusedDay,
-                locale: 'id_ID',
-                calendarFormat: CalendarFormat.month,
-                availableCalendarFormats: const {
-                  CalendarFormat.month: 'Month',
-                },
-                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                onDaySelected: (selectedDay, focusedDay) {
-                  setState(() {
-                    _selectedDay = selectedDay;
-                    _focusedDay = focusedDay;
-                  });
-                },
-                onPageChanged: (focusedDay) {
-                  if (focusedDay.month != _focusedDay.month ||
-                      focusedDay.year != _focusedDay.year) {
-                    _focusedDay = focusedDay;
-                    _fetchAgenda(focusedDay.month, focusedDay.year);
-                  }
-                },
-                calendarStyle: const CalendarStyle(
-                  todayDecoration: BoxDecoration(
-                    color: Color(0xFF0F53BF),
-                    shape: BoxShape.circle,
+                  daysOfWeekStyle: DaysOfWeekStyle(
+                    weekdayStyle: AppTheme.label.copyWith(color: AppTheme.primary),
+                    weekendStyle: AppTheme.label.copyWith(color: AppTheme.accent.withValues(alpha: 0.7)),
                   ),
-                  selectedDecoration: BoxDecoration(
-                    color: Color(0xFF68327E),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                headerStyle: const HeaderStyle(
-                  titleCentered: true,
-                  formatButtonVisible: false,
-                  titleTextStyle: TextStyle(
-                    color: Color(0xFF68327E),
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
+                  headerStyle: HeaderStyle(
+                    titleCentered: true, formatButtonVisible: false,
+                    titleTextStyle: AppTheme.heading3.copyWith(color: AppTheme.primary),
+                    leftChevronIcon: Icon(Icons.chevron_left, color: AppTheme.primary),
+                    rightChevronIcon: Icon(Icons.chevron_right, color: AppTheme.primary),
                   ),
                 ),
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // Daftar Agenda
+            // Agenda list
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                  ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
                   : _agendaList.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.event_busy_rounded, color: Colors.white54, size: 56),
-                              const SizedBox(height: 12),
-                              Text(
-                                _errorMessage,
-                                style: const TextStyle(color: Colors.white70, fontSize: 15),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        )
+                      ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.event_busy_rounded, color: AppTheme.textMuted, size: 56),
+                          const SizedBox(height: 12),
+                          Text(_errorMessage, style: AppTheme.body, textAlign: TextAlign.center),
+                        ]))
                       : ListView.builder(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                           itemCount: _agendaList.length,
-                          itemBuilder: (context, index) {
-                            return _buildAgendaCard(_agendaList[index]);
-                          },
+                          itemBuilder: (ctx, i) => _buildAgendaCard(_agendaList[i]),
                         ),
             ),
           ],
@@ -227,70 +157,27 @@ class _KalenderScreenState extends State<KalenderScreen> {
 
   Widget _buildAgendaCard(AgendaItem item) {
     return Container(
-      width: double.infinity,
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+      child: GlassCard(
+        borderRadius: 16, padding: const EdgeInsets.all(16),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 5),
+            child: Container(width: 10, height: 10,
+              decoration: BoxDecoration(color: AppTheme.accent, shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: AppTheme.accent.withValues(alpha: 0.5), blurRadius: 8)])),
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Dot indikator
-            Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF68327E),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.namaKegiatan,
-                    style: const TextStyle(
-                      color: Color(0xFF68327E),
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    _formatTanggal(item.tanggal),
-                    style: const TextStyle(
-                      color: Color(0xFF0F53BF),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (item.deskripsi.isNotEmpty && item.deskripsi != 'Tidak ada keterangan') ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      item.deskripsi,
-                      style: const TextStyle(color: Colors.black54, fontSize: 13),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(item.namaKegiatan, style: AppTheme.bodyLarge),
+            const SizedBox(height: 3),
+            Text(_formatTanggal(item.tanggal), style: AppTheme.bodySmall.copyWith(color: AppTheme.primary, fontWeight: FontWeight.w600)),
+            if (item.deskripsi.isNotEmpty && item.deskripsi != 'Tidak ada keterangan') ...[
+              const SizedBox(height: 6),
+              Text(item.deskripsi, style: AppTheme.bodySmall),
+            ],
+          ])),
+        ]),
       ),
     );
   }

@@ -1,31 +1,28 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/app_theme.dart';
 import '../../core/api_service.dart';
 import '../../core/session_manager.dart';
 import '../login/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
-
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
   static const String _keyPhotoUrl = 'profile_photo_url';
-
   bool isLoading = true;
   bool _isUploadingPhoto = false;
   Map<String, dynamic>? profileData;
   String _photoUrl = '';
 
   @override
-  void initState() {
-    super.initState();
-    _loadProfile();
-  }
+  void initState() { super.initState(); _loadProfile(); }
 
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
@@ -34,105 +31,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final res = await ApiService().getProfile();
       if (res['success'] == true) {
         final data = res['data'] as Map<String, dynamic>;
-        // Foto dari server
         final serverFoto = data['foto']?.toString() ?? '';
         if (serverFoto.isNotEmpty) {
           _photoUrl = ApiService.photoUrl(serverFoto);
           await prefs.setString(_keyPhotoUrl, _photoUrl);
         }
-        // Simpan gender icon
         final gender = data['gender']?.toString().toLowerCase() ?? '';
-        await prefs.setString('profile_gender_icon',
-            gender.contains('perempuan') ? 'cewe' : 'cowo');
-
+        await prefs.setString('profile_gender_icon', gender.contains('perempuan') ? 'cewe' : 'cowo');
         if (mounted) setState(() { profileData = data; isLoading = false; });
-      } else {
-        if (mounted) setState(() => isLoading = false);
-      }
+      } else { if (mounted) setState(() => isLoading = false); }
     } on ApiException catch (e) {
       if (e.isUnauthorized) {
         await SessionManager().logoutUser();
-        if (mounted) {
-          Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (route) => false,
-          );
-        }
-      } else {
-        if (mounted) setState(() => isLoading = false);
-      }
-    } catch (e) {
-      debugPrint('Error fetching profile: $e');
-      if (mounted) setState(() => isLoading = false);
-    }
+        if (mounted) Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()), (r) => false);
+      } else { if (mounted) setState(() => isLoading = false); }
+    } catch (e) { if (mounted) setState(() => isLoading = false); }
   }
 
   Future<void> _pickAndUploadPhoto() async {
     final picker = ImagePicker();
     final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text('Pilih Foto', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFF0F53BF)),
-              title: const Text('Kamera'),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF68327E)),
-              title: const Text('Galeri'),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-            ),
-            if (_photoUrl.isNotEmpty)
-              ListTile(
-                leading: const Icon(Icons.delete_rounded, color: Colors.red),
-                title: const Text('Hapus Foto', style: TextStyle(color: Colors.red)),
-                onTap: () => Navigator.pop(ctx, null),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+      context: context, backgroundColor: AppTheme.bgDarkPurple,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const SizedBox(height: 8),
+        Container(width: 40, height: 4, decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(2))),
+        const SizedBox(height: 16),
+        Text('Pilih Foto', style: AppTheme.heading3),
+        const SizedBox(height: 8),
+        ListTile(leading: const Icon(Icons.camera_alt_rounded, color: AppTheme.primary),
+          title: Text('Kamera', style: AppTheme.body.copyWith(color: AppTheme.textPrimary)),
+          onTap: () => Navigator.pop(ctx, ImageSource.camera)),
+        ListTile(leading: const Icon(Icons.photo_library_rounded, color: AppTheme.accent),
+          title: Text('Galeri', style: AppTheme.body.copyWith(color: AppTheme.textPrimary)),
+          onTap: () => Navigator.pop(ctx, ImageSource.gallery)),
+        if (_photoUrl.isNotEmpty)
+          ListTile(leading: const Icon(Icons.delete_rounded, color: AppTheme.error),
+            title: Text('Hapus Foto', style: AppTheme.body.copyWith(color: AppTheme.error)),
+            onTap: () => Navigator.pop(ctx, null)),
+        const SizedBox(height: 8),
+      ])),
     );
-
     if (!mounted) return;
-
-    // Hapus foto
     if (source == null && _photoUrl.isNotEmpty) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_keyPhotoUrl);
       setState(() => _photoUrl = '');
       return;
     }
-
     if (source == null) return;
-
-    final picked = await picker.pickImage(
-      source: source,
-      maxWidth: 800,
-      maxHeight: 800,
-      imageQuality: 80,
-    );
+    final picked = await picker.pickImage(source: source, maxWidth: 800, maxHeight: 800, imageQuality: 80);
     if (picked == null) return;
-
     setState(() => _isUploadingPhoto = true);
-
     try {
       final res = await ApiService().uploadPhoto(picked.path);
       if (res['success'] == true) {
@@ -144,28 +96,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           await prefs.setString(_keyPhotoUrl, newUrl);
           if (mounted) setState(() => _photoUrl = newUrl);
         }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Foto profil berhasil diperbarui')),
-          );
-        }
-      } else {
-        _showError(res['message']?.toString() ?? 'Gagal upload foto');
-      }
-    } on ApiException catch (e) {
-      _showError(e.message);
-    } catch (e) {
-      _showError('Gagal upload foto');
-    } finally {
-      if (mounted) setState(() => _isUploadingPhoto = false);
-    }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Foto profil berhasil diperbarui', style: AppTheme.body.copyWith(color: Colors.white)),
+            backgroundColor: AppTheme.bgDarkPurple));
+      } else { _showError(res['message']?.toString() ?? 'Gagal upload foto'); }
+    } on ApiException catch (e) { _showError(e.message); }
+    catch (e) { _showError('Gagal upload foto'); }
+    finally { if (mounted) setState(() => _isUploadingPhoto = false); }
   }
 
   void _showError(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red),
-    );
+      SnackBar(content: Text(msg, style: AppTheme.body.copyWith(color: Colors.white)), backgroundColor: AppTheme.error));
   }
 
   Future<void> _updateProfile(Map<String, String> updatedData) async {
@@ -176,327 +119,309 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final newGender = updatedData['gender'] ?? '';
         if (newGender.isNotEmpty) {
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('profile_gender_icon',
-              newGender.toLowerCase() == 'perempuan' ? 'cewe' : 'cowo');
+          await prefs.setString('profile_gender_icon', newGender.toLowerCase() == 'perempuan' ? 'cewe' : 'cowo');
         }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(res['message']?.toString() ?? 'Berhasil update profil')),
-          );
-        }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res['message']?.toString() ?? 'Berhasil update profil',
+            style: AppTheme.body.copyWith(color: Colors.white)), backgroundColor: AppTheme.bgDarkPurple));
         await _loadProfile();
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(res['message']?.toString() ?? 'Gagal update profil'),
-                backgroundColor: Colors.red),
-          );
-        }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res['message']?.toString() ?? 'Gagal update profil',
+            style: AppTheme.body.copyWith(color: Colors.white)), backgroundColor: AppTheme.error));
       }
     } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message, style: AppTheme.body.copyWith(color: Colors.white)), backgroundColor: AppTheme.error));
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Terjadi kesalahan koneksi'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => isLoading = false);
-    }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan koneksi', style: AppTheme.body.copyWith(color: Colors.white)), backgroundColor: AppTheme.error));
+    } finally { if (mounted) setState(() => isLoading = false); }
   }
 
   void _showEditDialog() {
     if (profileData == null) return;
-    final nameController = TextEditingController(text: profileData!['nama_siswa']);
-    final dateController = TextEditingController(text: profileData!['tanggal_lahir']);
-    final addressController = TextEditingController(text: profileData!['alamat']);
-    final parentNameController = TextEditingController(text: profileData!['nama_ortu']);
-    final phoneController = TextEditingController(text: profileData!['no_telp_ortu']);
+    final nameCtrl = TextEditingController(text: profileData!['nama_siswa']);
+    final dateCtrl = TextEditingController(text: profileData!['tanggal_lahir']);
+    final addrCtrl = TextEditingController(text: profileData!['alamat']);
+    final parentCtrl = TextEditingController(text: profileData!['nama_ortu']);
+    final phoneCtrl = TextEditingController(text: profileData!['no_telp_ortu']);
     String selectedGender = profileData!['gender'] ?? 'Laki-Laki';
 
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: const Text("Edit Data Profil"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildTextField(nameController, "Nama Anak"),
-                GestureDetector(
-                  onTap: () async {
-                    DateTime? pickedDate = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.tryParse(dateController.text) ?? DateTime(2010),
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime.now(),
-                    );
-                    if (pickedDate != null) {
-                      setDialogState(() {
-                        dateController.text = DateFormat('yyyy-MM-dd').format(pickedDate);
-                      });
-                    }
-                  },
-                  child: AbsorbPointer(
-                    child: _buildTextField(dateController, "Tanggal Lahir (YYYY-MM-DD)"),
-                  ),
-                ),
-                _buildTextField(addressController, "Alamat"),
-                DropdownButtonFormField<String>(
-                  initialValue: ["Laki-Laki", "Perempuan"].contains(selectedGender)
-                      ? selectedGender
-                      : "Laki-Laki",
-                  items: const [
-                    DropdownMenuItem(value: "Laki-Laki", child: Text("Laki-Laki")),
-                    DropdownMenuItem(value: "Perempuan", child: Text("Perempuan")),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) setDialogState(() => selectedGender = value);
-                  },
-                  decoration: const InputDecoration(labelText: "Gender"),
-                ),
-                _buildTextField(parentNameController, "Nama Orang Tua"),
-                _buildTextField(phoneController, "Nomor Telepon"),
+    showDialog(context: context, builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        backgroundColor: AppTheme.bgDarkPurple,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text("Edit Data Profil", style: AppTheme.heading3),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          _editField(nameCtrl, "Nama Anak"),
+          GestureDetector(
+            onTap: () async {
+              DateTime? pickedDate = await showDatePicker(
+                context: context, initialDate: DateTime.tryParse(dateCtrl.text) ?? DateTime(2010),
+                firstDate: DateTime(2000), lastDate: DateTime.now(),
+                builder: (ctx, child) => Theme(data: ThemeData.dark().copyWith(
+                  colorScheme: const ColorScheme.dark(primary: AppTheme.primary, surface: AppTheme.bgDarkPurple)),
+                  child: child!),
+              );
+              if (pickedDate != null) setDialogState(() { dateCtrl.text = DateFormat('yyyy-MM-dd').format(pickedDate); });
+            },
+            child: AbsorbPointer(child: _editField(dateCtrl, "Tanggal Lahir")),
+          ),
+          _editField(addrCtrl, "Alamat"),
+          Padding(padding: const EdgeInsets.symmetric(vertical: 8),
+            child: DropdownButtonFormField<String>(
+              initialValue: ["Laki-Laki", "Perempuan"].contains(selectedGender) ? selectedGender : "Laki-Laki",
+              dropdownColor: AppTheme.bgDarkPurple,
+              style: AppTheme.body.copyWith(color: AppTheme.textPrimary),
+              items: const [
+                DropdownMenuItem(value: "Laki-Laki", child: Text("Laki-Laki")),
+                DropdownMenuItem(value: "Perempuan", child: Text("Perempuan")),
               ],
+              onChanged: (v) { if (v != null) setDialogState(() => selectedGender = v); },
+              decoration: InputDecoration(labelText: "Gender", labelStyle: AppTheme.bodySmall,
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                  borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: AppTheme.primary),
+                  borderRadius: BorderRadius.circular(12))),
             ),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _updateProfile({
-                  'nama_siswa': nameController.text,
-                  'tanggal_lahir': dateController.text,
-                  'alamat': addressController.text,
-                  'gender': selectedGender,
-                  'nama_ortu': parentNameController.text,
-                  'no_telp_ortu': phoneController.text,
-                });
-              },
-              child: const Text("Simpan"),
-            ),
-          ],
-        ),
+          _editField(parentCtrl, "Nama Orang Tua"),
+          _editField(phoneCtrl, "Nomor Telepon"),
+        ])),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context),
+            child: Text("Batal", style: AppTheme.body.copyWith(color: AppTheme.textSecondary))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            onPressed: () { Navigator.pop(context); _updateProfile({
+              'nama_siswa': nameCtrl.text, 'tanggal_lahir': dateCtrl.text,
+              'alamat': addrCtrl.text, 'gender': selectedGender,
+              'nama_ortu': parentCtrl.text, 'no_telp_ortu': phoneCtrl.text,
+            }); },
+            child: Text("Simpan", style: AppTheme.button)),
+        ],
       ),
-    );
+    ));
   }
 
-  Widget _buildTextField(TextEditingController controller, String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
-      ),
-    );
+  Widget _editField(TextEditingController ctrl, String label) {
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 8),
+      child: TextField(controller: ctrl,
+        style: AppTheme.body.copyWith(color: AppTheme.textPrimary),
+        decoration: InputDecoration(labelText: label, labelStyle: AppTheme.bodySmall,
+          enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+            borderRadius: BorderRadius.circular(12)),
+          focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: AppTheme.primary),
+            borderRadius: BorderRadius.circular(12)))));
   }
 
   void _logout() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Konfirmasi"),
-        content: const Text("Apakah Anda yakin ingin keluar dari perangkat?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Tidak")),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await ApiService().logout();
-              if (!context.mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
+    showDialog(context: context, builder: (context) => AlertDialog(
+      backgroundColor: AppTheme.bgDarkPurple,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text("Konfirmasi", style: AppTheme.heading3),
+      content: Text("Apakah Anda yakin ingin keluar dari perangkat?", style: AppTheme.body),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text("Tidak", style: AppTheme.body.copyWith(color: AppTheme.textSecondary)),
+        ),
+        TextButton(
+          onPressed: () async {
+            // 1. Tutup dialog segera
+            Navigator.pop(context);
+            
+            try {
+              // 2. Jalankan proses logout (Hapus session lokal + API)
+              // Kita panggil SessionManager secara langsung untuk memastikan data lokal bersih
+              await SessionManager().logoutUser();
+              
+              // 3. Pindah ke halaman Login menggunakan rootNavigator agar keluar dari shell MainScreen
+              if (!mounted) return;
+              Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
                 (route) => false,
               );
-            },
-            child: const Text("Ya"),
-          ),
-        ],
-      ),
-    );
+              
+              // 4. Panggil API logout di background (tidak perlu ditunggu/await jika ingin instan)
+              ApiService().logout(); 
+              
+            } catch (e) {
+              debugPrint('Logout Error: $e');
+              // Jika terjadi error, tetap paksa pindah ke Login
+              if (!mounted) return;
+              Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
+            }
+          },
+          child: Text("Ya", style: AppTheme.body.copyWith(color: AppTheme.error)),
+        ),
+      ],
+    ));
   }
 
   Widget _buildAvatar(String genderImagePath) {
-    return Stack(
-      children: [
-        CircleAvatar(
-          radius: 52,
-          backgroundColor: Colors.white,
+    return Stack(children: [
+      Container(
+        decoration: BoxDecoration(shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.4), blurRadius: 30, spreadRadius: 2)]),
+        child: CircleAvatar(radius: 52, backgroundColor: AppTheme.bgDarkPurple,
           child: ClipOval(
             child: _isUploadingPhoto
-                ? const SizedBox(
-                    width: 96, height: 96,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
+                ? const SizedBox(width: 96, height: 96, child: Center(child: CircularProgressIndicator(color: AppTheme.primary)))
                 : _photoUrl.isNotEmpty
-                    ? Image.network(
-                        _photoUrl,
-                        width: 96, height: 96, fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            Image.asset(genderImagePath, width: 96, height: 96, fit: BoxFit.cover),
-                      )
+                    ? Image.network(_photoUrl, width: 96, height: 96, fit: BoxFit.cover,
+                        errorBuilder: (c, e, s) => Image.asset(genderImagePath, width: 96, height: 96, fit: BoxFit.cover))
                     : Image.asset(genderImagePath, width: 96, height: 96, fit: BoxFit.cover),
-          ),
-        ),
-        // Tombol edit foto
-        Positioned(
-          bottom: 0,
-          right: 0,
-          child: GestureDetector(
-            onTap: _pickAndUploadPhoto,
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: const BoxDecoration(
-                color: Color(0xFF0F53BF),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
-            ),
-          ),
-        ),
-        // Tombol edit data (pojok kiri bawah)
-        Positioned(
-          bottom: 0,
-          left: 0,
-          child: GestureDetector(
-            onTap: _showEditDialog,
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: const BoxDecoration(
-                color: Color(0xFF68327E),
-                shape: BoxShape.circle,
-              ),
-              padding: const EdgeInsets.all(7),
-              child: Image.asset('assets/images/ic_edit.png', fit: BoxFit.contain),
-            ),
-          ),
-        ),
-      ],
-    );
+          )),
+      ),
+      Positioned(bottom: 0, right: 0, child: GestureDetector(onTap: _pickAndUploadPhoto,
+        child: Container(width: 32, height: 32,
+          decoration: BoxDecoration(
+            gradient: AppTheme.primaryGradient, shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.4), blurRadius: 8)]),
+          child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16)))),
+      Positioned(bottom: 0, left: 0, child: GestureDetector(onTap: _showEditDialog,
+        child: Container(width: 32, height: 32,
+          decoration: BoxDecoration(color: AppTheme.accent, shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: AppTheme.accent.withValues(alpha: 0.4), blurRadius: 8)]),
+          padding: const EdgeInsets.all(7),
+          child: Image.asset('assets/images/ic_edit.png', fit: BoxFit.contain)))),
+    ]);
   }
 
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
       return Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF007ABF), Color(0xFF45287F), Color(0xFF68327E)],
-          ),
-        ),
-        child: const Center(child: CircularProgressIndicator(color: Colors.white)),
-      );
+        decoration: const BoxDecoration(gradient: AppTheme.bgGradient),
+        child: const Center(child: CircularProgressIndicator(color: AppTheme.primary)));
     }
 
-    final String gender = profileData?['gender'] ?? "";
-    final String genderImagePath = gender.toLowerCase() == "perempuan"
-        ? "assets/images/icon_cewe.png"
-        : "assets/images/icon_cowo.png";
+    final gender = profileData?['gender'] ?? "";
+    final genderImagePath = gender.toLowerCase() == "perempuan"
+        ? "assets/images/icon_cewe.png" : "assets/images/icon_cowo.png";
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F53BF),
-      body: Column(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              child: Column(
+    return DarkBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Column(children: [
+          // Header (Transparent)
+          SafeArea(bottom: false,
+            child: Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              child: Column(children: [
+                Row(children: [
+                  const SizedBox(width: 48),
+                  Expanded(child: Text('Profile', textAlign: TextAlign.center, style: AppTheme.heading2)),
+                  const SizedBox(width: 48),
+                ]),
+                const SizedBox(height: 20),
+                _buildAvatar(genderImagePath),
+                const SizedBox(height: 12),
+                Text(profileData?['nama_siswa'] ?? "-", style: AppTheme.heading2),
+                const SizedBox(height: 4),
+                Text((profileData?['kelas'] ?? "-").toUpperCase(),
+                  style: AppTheme.bodySmall.copyWith(color: AppTheme.primary, letterSpacing: 1.2, fontWeight: FontWeight.w600)),
+              ]))),
+          // Body (Glassmorphism pane)
+          Expanded(child: ClipRRect(
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppTheme.bgDark.withValues(alpha: 0.55),
+                  border: Border(
+                    top: BorderSide(color: Colors.white.withValues(alpha: 0.15), width: 1.5),
+                    left: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+                    right: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+                  ),
+                ),
+                child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 32, 20, 32),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _buildSectionHeader("Identitas Anak", AppTheme.primary),
+              const SizedBox(height: 16),
+              _buildInfoCard(Icons.badge_rounded, "NAMA LENGKAP", profileData?['nama_siswa'] ?? "-"),
+              _buildInfoCard(Icons.location_on_rounded, "ALAMAT", profileData?['alamat'] ?? "-", iconColor: AppTheme.info),
+              Row(
                 children: [
-                  const Row(
-                    children: [
-                      SizedBox(width: 48),
-                      Expanded(
-                        child: Text(
-                          'Profile',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 48),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _buildAvatar(genderImagePath),
-                  const SizedBox(height: 12),
-                  Text(
-                    profileData?['nama_siswa'] ?? "-",
-                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    (profileData?['kelas'] ?? "-").toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white70, fontSize: 14,
-                      fontWeight: FontWeight.w600, letterSpacing: 1.2,
-                    ),
-                  ),
+                  Expanded(child: _buildGridCard("TANGGAL LAHIR", profileData?['tanggal_lahir'] ?? "-")),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildGridCard("JENIS KELAMIN", profileData?['gender'] ?? "-")),
                 ],
               ),
+              const SizedBox(height: 32),
+              
+              _buildSectionHeader("Identitas Orangtua", AppTheme.accent),
+              const SizedBox(height: 16),
+              _buildInfoCard(Icons.person_rounded, "NAMA ORANGTUA", profileData?['nama_ortu'] ?? "-", iconColor: AppTheme.accent),
+              _buildInfoCard(Icons.phone_rounded, "NO. TELEPON", profileData?['no_telp_ortu'] ?? "-", iconColor: AppTheme.accent),
+              
+              const SizedBox(height: 40),
+              
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout_rounded, color: AppTheme.error),
+                  label: Text('KELUAR DARI PERANGKAT', style: AppTheme.bodyLarge.copyWith(color: AppTheme.error, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: BorderSide(color: AppTheme.error.withValues(alpha: 0.5), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
+            ])),
+              ),
             ),
+          )),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, Color indicatorColor) {
+    return Row(
+      children: [
+        Container(width: 4, height: 20, decoration: BoxDecoration(color: indicatorColor, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 8),
+        Text(title, style: AppTheme.heading3),
+      ],
+    );
+  }
+
+  Widget _buildInfoCard(IconData icon, String label, String value, {Color iconColor = AppTheme.primary}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
+          const SizedBox(width: 16),
           Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(28),
-                  topRight: Radius.circular(28),
-                ),
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Identitas Anak',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
-                    const SizedBox(height: 12),
-                    _buildInfoRow("Nama Anak:", profileData?['nama_siswa'] ?? "-"),
-                    _buildInfoRow("Alamat:", profileData?['alamat'] ?? "-"),
-                    _buildInfoRow("Tanggal Lahir:", profileData?['tanggal_lahir'] ?? "-"),
-                    _buildInfoRow("Gender:", profileData?['gender'] ?? "-"),
-                    const SizedBox(height: 20),
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    const Text('Identitas Orangtua',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
-                    const SizedBox(height: 12),
-                    _buildInfoRow("Nama Orang Tua:", profileData?['nama_ortu'] ?? "-"),
-                    _buildInfoRow("Nomor Telepon:", profileData?['no_telp_ortu'] ?? "-"),
-                    const SizedBox(height: 32),
-                    Center(
-                      child: TextButton(
-                        onPressed: _logout,
-                        child: const Text(
-                          'KELUAR DARI PERANGKAT',
-                          style: TextStyle(
-                            color: Colors.red, fontWeight: FontWeight.bold,
-                            fontSize: 15, letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppTheme.label.copyWith(color: AppTheme.textMuted, fontSize: 10)),
+                const SizedBox(height: 4),
+                Text(value, style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.w600)),
+              ],
             ),
           ),
         ],
@@ -504,23 +429,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+  Widget _buildGridCard(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 130,
-            child: Text(label, style: const TextStyle(color: Colors.black54, fontSize: 14)),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-          ),
+          Text(label, style: AppTheme.label.copyWith(color: AppTheme.textMuted, fontSize: 10)),
+          const SizedBox(height: 4),
+          Text(value, style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.w600)),
         ],
       ),
     );

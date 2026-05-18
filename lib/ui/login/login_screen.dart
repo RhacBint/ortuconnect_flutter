@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/app_theme.dart';
 import '../../core/api_service.dart';
 import '../../core/session_manager.dart';
 import '../../core/notification_service.dart';
@@ -26,7 +27,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
-  late final Animation<double> _bgAnim;
 
   @override
   void initState() {
@@ -36,8 +36,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       vsync: this,
       duration: const Duration(seconds: 6),
     )..repeat(reverse: true);
-
-    _bgAnim = CurvedAnimation(parent: _bgController, curve: Curves.easeInOut);
 
     _fadeController = AnimationController(
       vsync: this,
@@ -143,8 +141,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   void _showToast(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF68327E),
+        content: Text(message, style: AppTheme.body.copyWith(color: Colors.white)),
+        backgroundColor: AppTheme.bgDarkPurple,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 3),
@@ -156,8 +154,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     return Scaffold(
       body: AnimatedBuilder(
-        animation: _bgAnim,
+        animation: _bgController,
         builder: (context, child) {
+          final t = _bgController.value;
           return Container(
             width: double.infinity,
             height: double.infinity,
@@ -166,11 +165,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color.lerp(const Color(0xFF0A6EBD), const Color(0xFF1A3A6B), _bgAnim.value)!,
-                  Color.lerp(const Color(0xFF45287F), const Color(0xFF6A1B9A), _bgAnim.value)!,
-                  Color.lerp(const Color(0xFF68327E), const Color(0xFF880E4F), _bgAnim.value)!,
+                  Color.lerp(AppTheme.bgDark, const Color(0xFF120825), t)!,
+                  Color.lerp(AppTheme.bgDarkPurple, const Color(0xFF1E0A30), t)!,
+                  Color.lerp(AppTheme.bgDeep, const Color(0xFF150730), t)!,
                 ],
-                stops: const [0.0, 0.5, 1.0],
               ),
             ),
             child: child,
@@ -178,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         },
         child: Stack(
           children: [
-            _buildDecorativeCircles(),
+            _buildDecorativeOrbs(),
             SafeArea(
               child: Center(
                 child: SingleChildScrollView(
@@ -199,33 +197,33 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildDecorativeCircles() {
+  Widget _buildDecorativeOrbs() {
     return AnimatedBuilder(
-      animation: _bgAnim,
+      animation: _bgController,
       builder: (context, child) {
         final size = MediaQuery.of(context).size;
-        final t = _bgAnim.value;
+        final t = _bgController.value;
         return Stack(
           children: [
             Positioned(
               top: -size.height * 0.12 + (t * 18),
               left: -size.width * 0.18,
-              child: _softOrb(size.width * 0.72, Colors.white.withValues(alpha: 0.06)),
+              child: _softOrb(size.width * 0.72, AppTheme.primary.withValues(alpha: 0.1)),
             ),
             Positioned(
               bottom: -size.height * 0.1 - (t * 14),
               right: -size.width * 0.2,
-              child: _softOrb(size.width * 0.78, Colors.white.withValues(alpha: 0.05)),
+              child: _softOrb(size.width * 0.78, AppTheme.accent.withValues(alpha: 0.08)),
             ),
             Positioned(
               top: size.height * 0.06 - (t * 12),
               right: -size.width * 0.1,
-              child: _softOrb(size.width * 0.45, Colors.white.withValues(alpha: 0.07)),
+              child: _softOrb(size.width * 0.45, AppTheme.indigo.withValues(alpha: 0.1)),
             ),
             Positioned(
               bottom: size.height * 0.18 + (t * 10),
               left: -size.width * 0.12,
-              child: _softOrb(size.width * 0.42, Colors.white.withValues(alpha: 0.06)),
+              child: _softOrb(size.width * 0.42, AppTheme.primary.withValues(alpha: 0.08)),
             ),
           ],
         );
@@ -239,79 +237,73 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color, Colors.transparent],
-          stops: const [0.0, 1.0],
-        ),
+        gradient: RadialGradient(colors: [color, Colors.transparent]),
       ),
     );
   }
 
   Widget _buildCard() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        color: Colors.white.withValues(alpha: 0.95),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 40,
-            spreadRadius: 0,
-            offset: const Offset(0, 16),
-          ),
-          BoxShadow(
-            color: const Color(0xFF53BBF7).withValues(alpha: 0.15),
-            blurRadius: 60,
-            spreadRadius: 0,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.only(top: 32, bottom: 20),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFF3F8FF), Color(0xFFF8F0FF)],
-                ),
-              ),
-              child: Image.asset(
-                'assets/images/logo_ortuconnect.png',
-                height: 161,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 24),
-                  _buildTextField(
-                    controller: _usernameController,
-                    hint: 'Nomor Siswa',
-                    icon: Icons.person_outline_rounded,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildTextField(
-                    controller: _passwordController,
-                    hint: 'Kata Sandi',
-                    icon: Icons.lock_outline_rounded,
-                    isPassword: true,
-                  ),
-                  const SizedBox(height: 28),
-                  _buildLoginButton(),
+    return GlassCard(
+      borderRadius: 28,
+      blur: 30,
+      backgroundColor: Colors.white.withValues(alpha: 0.06),
+      borderOpacity: 0.1,
+      padding: EdgeInsets.zero,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Logo area
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.only(top: 32, bottom: 20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.primary.withValues(alpha: 0.08),
+                  AppTheme.accent.withValues(alpha: 0.05),
                 ],
               ),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(28),
+                topRight: Radius.circular(28),
+              ),
             ),
-          ],
-        ),
+            child: Image.asset(
+              'assets/images/logo_ortuconnect.png',
+              height: 140,
+            ),
+          ),
+          // Form
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _usernameController,
+                  hint: 'Nomor Siswa',
+                  icon: Icons.person_outline_rounded,
+                ),
+                const SizedBox(height: 14),
+                _buildTextField(
+                  controller: _passwordController,
+                  hint: 'Kata Sandi',
+                  icon: Icons.lock_outline_rounded,
+                  isPassword: true,
+                ),
+                const SizedBox(height: 28),
+                GradientButton(
+                  onPressed: _handleLogin,
+                  isLoading: _isLoading,
+                  child: Text('Masuk', style: AppTheme.button),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -325,25 +317,25 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        color: const Color(0xFFF4F6FF),
-        border: Border.all(color: const Color(0xFFDDE3F5), width: 1.2),
+        color: Colors.white.withValues(alpha: 0.06),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: TextField(
         controller: controller,
         enabled: !_isLoading,
         obscureText: isPassword && !_passwordVisible,
-        style: const TextStyle(fontSize: 15, color: Color(0xFF2D2D2D)),
+        style: AppTheme.bodyLarge,
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
-          prefixIcon: Icon(icon, color: const Color(0xFF7C5CBF), size: 20),
+          hintStyle: AppTheme.body.copyWith(color: AppTheme.textMuted),
+          prefixIcon: Icon(icon, color: AppTheme.primary, size: 20),
           suffixIcon: isPassword
               ? IconButton(
                   icon: Icon(
                     _passwordVisible
                         ? Icons.visibility_rounded
                         : Icons.visibility_off_rounded,
-                    color: const Color(0xFF7C5CBF),
+                    color: AppTheme.primary,
                     size: 20,
                   ),
                   onPressed: () =>
@@ -351,64 +343,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 )
               : null,
           border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
-      ),
-    );
-  }
-
-  Widget _buildLoginButton() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      height: 52,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: _isLoading
-            ? const LinearGradient(
-                colors: [Color(0xFFB0BEC5), Color(0xFFB0BEC5)])
-            : const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF53BBF7), Color(0xFF7C4DFF)],
-              ),
-        boxShadow: _isLoading
-            ? []
-            : [
-                BoxShadow(
-                  color: const Color(0xFF53BBF7).withValues(alpha: 0.45),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-      ),
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _handleLogin,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: _isLoading
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Colors.white,
-                ),
-              )
-            : const Text(
-                'Masuk',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  letterSpacing: 0.5,
-                ),
-              ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/app_theme.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../kalender/kalender_screen.dart';
 import '../absen/absensi_screen.dart';
@@ -18,14 +19,16 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   int _unreadCount = 0;
 
-  static const List<Widget> _widgetOptions = <Widget>[
-    DashboardScreen(),
-    AbsensiScreen(),
-    PerizinanScreen(),
-    KalenderScreen(),
-    NotifikasiScreen(),
-    ProfileScreen(),
-  ];
+  List<Widget> _getWidgetOptions() {
+    return [
+      DashboardScreen(onNavigate: _onItemTapped),
+      const AbsensiScreen(),
+      const PerizinanScreen(),
+      const KalenderScreen(),
+      const NotifikasiScreen(),
+      const ProfileScreen(),
+    ];
+  }
 
   @override
   void initState() {
@@ -49,7 +52,8 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _widgetOptions.elementAt(_selectedIndex),
+      backgroundColor: AppTheme.bgDark,
+      body: _getWidgetOptions().elementAt(_selectedIndex),
       bottomNavigationBar: _buildNavBar(),
     );
   }
@@ -66,10 +70,13 @@ class _MainScreenState extends State<MainScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: AppTheme.bgDarkPurple.withValues(alpha: 0.95),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
+            color: AppTheme.primary.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -100,9 +107,12 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? const Color(0xFF0F53BF).withValues(alpha: 0.12)
+                        ? AppTheme.primary.withValues(alpha: 0.15)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
+                    border: isSelected
+                        ? Border.all(color: AppTheme.primary.withValues(alpha: 0.2))
+                        : null,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -114,8 +124,8 @@ class _MainScreenState extends State<MainScreen> {
                             AssetImage(items[index]['icon']!),
                             size: 24,
                             color: isSelected
-                                ? const Color(0xFF0F53BF)
-                                : Colors.grey.shade500,
+                                ? AppTheme.primary
+                                : AppTheme.textMuted,
                           ),
                           // Badge unread untuk tab notifikasi
                           if (isNotifTab && _unreadCount > 0)
@@ -125,7 +135,7 @@ class _MainScreenState extends State<MainScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(3),
                                 decoration: const BoxDecoration(
-                                  color: Colors.red,
+                                  color: AppTheme.accent,
                                   shape: BoxShape.circle,
                                 ),
                                 constraints: const BoxConstraints(
@@ -133,7 +143,7 @@ class _MainScreenState extends State<MainScreen> {
                                 ),
                                 child: Text(
                                   _unreadCount > 9 ? '9+' : '$_unreadCount',
-                                  style: const TextStyle(
+                                  style: AppTheme.bodySmall.copyWith(
                                     color: Colors.white,
                                     fontSize: 9,
                                     fontWeight: FontWeight.bold,
@@ -147,12 +157,10 @@ class _MainScreenState extends State<MainScreen> {
                       const SizedBox(height: 4),
                       AnimatedDefaultTextStyle(
                         duration: const Duration(milliseconds: 250),
-                        style: TextStyle(
+                        style: AppTheme.bodySmall.copyWith(
                           fontSize: isSelected ? 10 : 9,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                          color: isSelected
-                              ? const Color(0xFF0F53BF)
-                              : Colors.grey.shade500,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color: isSelected ? AppTheme.primary : AppTheme.textMuted,
                         ),
                         child: Text(items[index]['label']!),
                       ),
