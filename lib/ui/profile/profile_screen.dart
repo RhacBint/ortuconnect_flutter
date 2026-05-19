@@ -58,11 +58,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } on ApiException catch (e) {
       if (e.isUnauthorized) {
         await SessionManager().logoutUser();
-        if (mounted)
+        if (mounted) {
           Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const LoginScreen()),
             (r) => false,
           );
+        }
       } else {
         if (mounted) setState(() => isLoading = false);
       }
@@ -73,78 +74,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pickAndUploadPhoto() async {
     final picker = ImagePicker();
-    try {
-      final action = await showModalBottomSheet<dynamic>(
-        context: context,
-        backgroundColor: AppTheme.bgDarkPurple,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (ctx) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppTheme.bgDarkPurple,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
               ),
-              const SizedBox(height: 16),
-              Text('Pilih Foto', style: AppTheme.heading3),
-              const SizedBox(height: 8),
+            ),
+            const SizedBox(height: 16),
+            Text('Pilih Foto', style: AppTheme.heading3),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(
+                Icons.camera_alt_rounded,
+                color: AppTheme.primary,
+              ),
+              title: Text(
+                'Kamera',
+                style: AppTheme.body.copyWith(color: AppTheme.textPrimary),
+              ),
+              onTap: () => Navigator.pop(ctx, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.photo_library_rounded,
+                color: AppTheme.accent,
+              ),
+              title: Text(
+                'Galeri',
+                style: AppTheme.body.copyWith(color: AppTheme.textPrimary),
+              ),
+              onTap: () => Navigator.pop(ctx, 'gallery'),
+            ),
+            if (_photoUrl.isNotEmpty)
               ListTile(
                 leading: const Icon(
-                  Icons.camera_alt_rounded,
-                  color: AppTheme.primary,
+                  Icons.delete_rounded,
+                  color: AppTheme.error,
                 ),
                 title: Text(
-                  'Kamera',
-                  style: AppTheme.body.copyWith(color: AppTheme.textPrimary),
+                  'Hapus Foto',
+                  style: AppTheme.body.copyWith(color: AppTheme.error),
                 ),
-                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                onTap: () => Navigator.pop(ctx, 'delete'),
               ),
-              ListTile(
-                leading: const Icon(
-                  Icons.photo_library_rounded,
-                  color: AppTheme.accent,
-                ),
-                title: Text(
-                  'Galeri',
-                  style: AppTheme.body.copyWith(color: AppTheme.textPrimary),
-                ),
-                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-              ),
-              if (_photoUrl.isNotEmpty)
-                ListTile(
-                  leading: const Icon(
-                    Icons.delete_rounded,
-                    color: AppTheme.error,
-                  ),
-                  title: Text(
-                    'Hapus Foto',
-                    style: AppTheme.body.copyWith(color: AppTheme.error),
-                  ),
-                  onTap: () => Navigator.pop(ctx, 'delete'),
-                ),
-              const SizedBox(height: 8),
-            ],
-          ),
+            const SizedBox(height: 8),
+          ],
         ),
-      );
-      if (!mounted) return;
+      ),
+    );
+    if (!mounted) return;
 
-      if (action == 'delete') {
-        setState(() => _isUploadingPhoto = true);
+    if (action == 'delete') {
+      setState(() => _isUploadingPhoto = true);
+      try {
         final res = await ApiService().deletePhoto();
         if (res['success'] == true) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.remove(_keyPhotoUrl);
           if (mounted) setState(() => _photoUrl = '');
-          if (mounted)
+          if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
@@ -154,22 +155,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 backgroundColor: AppTheme.bgDarkPurple,
               ),
             );
+          }
         } else {
           _showError(res['message']?.toString() ?? 'Gagal menghapus foto');
         }
-        return;
+      } on ApiException catch (e) {
+        _showError(e.message);
+      } catch (e) {
+        _showError('Gagal menghapus foto');
+      } finally {
+        if (mounted) setState(() => _isUploadingPhoto = false);
       }
+      return;
+    }
 
-      if (action is! ImageSource) return;
-      final picked = await picker.pickImage(
-        source: action,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 80,
-      );
-      if (picked == null) return;
+    if (action == null) return;
 
-      setState(() => _isUploadingPhoto = true);
+    final ImageSource source = action == 'camera'
+        ? ImageSource.camera
+        : ImageSource.gallery;
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 80,
+    );
+    if (picked == null) return;
+    setState(() => _isUploadingPhoto = true);
+    try {
       final res = await ApiService().uploadPhoto(picked.path);
       if (res['success'] == true) {
         final data = res['data'] as Map<String, dynamic>?;
@@ -180,7 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           await prefs.setString(_keyPhotoUrl, newUrl);
           if (mounted) setState(() => _photoUrl = newUrl);
         }
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -190,14 +203,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               backgroundColor: AppTheme.bgDarkPurple,
             ),
           );
+        }
       } else {
         _showError(res['message']?.toString() ?? 'Gagal upload foto');
       }
     } on ApiException catch (e) {
       _showError(e.message);
     } catch (e) {
-      debugPrint('Error pick/upload photo: $e');
-      _showError('Gagal memproses foto');
+      _showError('Gagal upload foto');
     } finally {
       if (mounted) setState(() => _isUploadingPhoto = false);
     }
@@ -226,7 +239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             newGender.toLowerCase() == 'perempuan' ? 'cewe' : 'cowo',
           );
         }
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -236,9 +249,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               backgroundColor: AppTheme.bgDarkPurple,
             ),
           );
+        }
         await _loadProfile();
       } else {
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -248,9 +262,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               backgroundColor: AppTheme.error,
             ),
           );
+        }
       }
     } on ApiException catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -260,8 +275,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundColor: AppTheme.error,
           ),
         );
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -271,6 +287,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundColor: AppTheme.error,
           ),
         );
+      }
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
