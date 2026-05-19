@@ -56,7 +56,11 @@ class _PerizinanScreenState extends State<PerizinanScreen> with WidgetsBindingOb
         _setError(res['message']?.toString() ?? 'Tidak ada riwayat perizinan');
       }
     } on ApiException catch (e) {
-      if (e.isUnauthorized) _redirectLogin(); else _setError(e.message);
+      if (e.isUnauthorized) {
+        _redirectLogin();
+      } else {
+        _setError(e.message);
+      }
     } catch (e) { _setError('Gagal memuat riwayat izin'); }
   }
 
@@ -254,8 +258,10 @@ class _PerizinanScreenState extends State<PerizinanScreen> with WidgetsBindingOb
   }
 
   Widget _buildRiwayatList() {
-    if (_isLoading) return const Center(child: Padding(padding: EdgeInsets.all(20),
+    if (_isLoading) {
+      return const Center(child: Padding(padding: EdgeInsets.all(20),
       child: CircularProgressIndicator(color: AppTheme.primary)));
+    }
 
     final filtered = _riwayatIzin.where((item) {
       if (_selectedMonthFilter == 'Semua Bulan') return true;

@@ -6,7 +6,6 @@ import '../absen/absensi_screen.dart';
 import '../perizinan/perizinan_screen.dart';
 import '../profile/profile_screen.dart';
 import '../notifikasi/notifikasi_screen.dart';
-import '../../core/notification_database.dart';
 import '../../core/notification_service.dart';
 import '../../core/api_service.dart';
 

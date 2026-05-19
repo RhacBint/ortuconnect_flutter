@@ -73,21 +73,23 @@ class _AbsensiScreenState extends State<AbsensiScreen>
         _listAbsensi.sort(
           (a, b) => (b['tanggal'] ?? '').compareTo(a['tanggal'] ?? ''),
         );
-        if (mounted)
+        if (mounted) {
           setState(() {
             _isLoading = false;
             _errorMessage = null;
           });
+        }
       } else {
         _setError(res['message']?.toString() ?? 'Data tidak tersedia');
       }
     } on ApiException catch (e) {
       if (e.isUnauthorized) {
-        if (mounted)
+        if (mounted) {
           Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const LoginScreen()),
             (r) => false,
           );
+        }
       } else {
         _setError(e.message);
       }
@@ -97,20 +99,21 @@ class _AbsensiScreenState extends State<AbsensiScreen>
   }
 
   void _setError(String msg) {
-    if (mounted)
+    if (mounted) {
       setState(() {
         _isLoading = false;
         _errorMessage = msg;
       });
+    }
   }
 
   Map<String, int> _getStats() {
     int hadir = 0, izin = 0, sakit = 0, alpha = 0;
     for (final item in _listAbsensi) {
       final s = item['status']?.toString().toUpperCase() ?? '';
-      if (s == 'HADIR')
+      if (s == 'HADIR') {
         hadir++;
-      else if (s == 'IZIN')
+      } else if (s == 'IZIN')
         izin++;
       else if (s == 'SAKIT')
         sakit++;
