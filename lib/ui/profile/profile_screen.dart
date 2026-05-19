@@ -234,23 +234,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Navigator.pop(context);
             
             try {
-              // 2. Jalankan proses logout (Hapus session lokal + API)
-              // Kita panggil SessionManager secara langsung untuk memastikan data lokal bersih
-              await SessionManager().logoutUser();
+              // Simpan navigator instance sebelum async call agar aman dari BuildContext async gap
+              final navigator = Navigator.of(context, rootNavigator: true);
               
-              // 3. Pindah ke halaman Login menggunakan rootNavigator agar keluar dari shell MainScreen
-              if (!mounted) return;
-              Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+              // 2. Jalankan proses logout API terlebih dahulu.
+              // Ini wajib diawait agar API menggunakan token session yang masih aktif untuk
+              // menghapus token FCM di database server Laravel.
+              await ApiService().logout();
+              
+              // 3. Pindah ke halaman Login
+              navigator.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
                 (route) => false,
               );
               
-              // 4. Panggil API logout di background (tidak perlu ditunggu/await jika ingin instan)
-              ApiService().logout(); 
-              
             } catch (e) {
               debugPrint('Logout Error: $e');
-              // Jika terjadi error, tetap paksa pindah ke Login
+              // Jika terjadi error, tetap paksa bersihkan session lokal & pindah ke Login
+              await SessionManager().logoutUser();
               if (!mounted) return;
               Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const LoginScreen()),

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'notification_database.dart';
 
 /// Satu tempat untuk semua konfigurasi dan request ke Laravel API
 class ApiService {
@@ -41,6 +42,12 @@ class ApiService {
   Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    try {
+      await NotificationDatabase().deleteAll();
+      debugPrint('Local SQLite notification history cleared successfully on clearSession');
+    } catch (e) {
+      debugPrint('Failed to clear local notification history: $e');
+    }
   }
 
   Future<bool> isLoggedIn() async {
@@ -235,6 +242,53 @@ class ApiService {
     } catch (e) {
       debugPrint('saveFcmToken error: $e');
     }
+  }
+
+  /// GET /api/notifications
+  /// Mengambil semua riwayat notifikasi dari server
+  Future<List<NotificationItem>> getNotifications() async {
+    final headers = await _authHeaders();
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications'),
+      headers: headers,
+    ).timeout(const Duration(seconds: 15));
+    
+    final body = _handle(response);
+    final List data = body['data'] ?? [];
+    return data.map((json) => NotificationItem.fromJson(json)).toList();
+  }
+
+  /// PUT /api/notifications/{id}/read
+  /// Menandai satu notifikasi sebagai sudah dibaca
+  Future<void> markNotificationRead(int id) async {
+    final headers = await _authHeaders();
+    final response = await http.put(
+      Uri.parse('$baseUrl/notifications/$id/read'),
+      headers: headers,
+    ).timeout(const Duration(seconds: 10));
+    _handle(response);
+  }
+
+  /// PUT /api/notifications/read-all
+  /// Menandai semua notifikasi sebagai sudah dibaca
+  Future<void> markAllNotificationsRead() async {
+    final headers = await _authHeaders();
+    final response = await http.put(
+      Uri.parse('$baseUrl/notifications/read-all'),
+      headers: headers,
+    ).timeout(const Duration(seconds: 10));
+    _handle(response);
+  }
+
+  /// DELETE /api/notifications/{id}
+  /// Menghapus notifikasi tertentu dari server
+  Future<void> deleteNotification(int id) async {
+    final headers = await _authHeaders();
+    final response = await http.delete(
+      Uri.parse('$baseUrl/notifications/$id'),
+      headers: headers,
+    ).timeout(const Duration(seconds: 10));
+    _handle(response);
   }
 
   /// Foto URL lengkap dari path relatif server

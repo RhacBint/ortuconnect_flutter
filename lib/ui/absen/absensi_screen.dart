@@ -175,7 +175,15 @@ class _AbsensiScreenState extends State<AbsensiScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Riwayat Absensi', style: AppTheme.heading1),
+                  Expanded(
+                    child: Text(
+                      'Riwayat Absensi',
+                      style: AppTheme.heading1,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,

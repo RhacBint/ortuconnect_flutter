@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/app_theme.dart';
 import '../../core/notification_database.dart';
+import '../../core/api_service.dart';
 
 class NotifikasiScreen extends StatefulWidget {
   const NotifikasiScreen({super.key});
@@ -12,20 +13,47 @@ class NotifikasiScreen extends StatefulWidget {
 class _NotifikasiScreenState extends State<NotifikasiScreen> {
   List<NotificationItem> _notifications = [];
   bool _isLoading = true;
+  String _errorMessage = '';
 
   @override
-  void initState() { super.initState(); _loadNotifications(); }
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
 
   Future<void> _loadNotifications() async {
-    final items = await NotificationDatabase().getAll();
-    await NotificationDatabase().markAllRead();
-    if (mounted) setState(() { _notifications = items; _isLoading = false; });
+    if (mounted) setState(() { _isLoading = true; _errorMessage = ''; });
+    try {
+      final items = await ApiService().getNotifications();
+      try {
+        await ApiService().markAllNotificationsRead();
+      } catch (e) {
+        debugPrint('Mark all read error: $e');
+      }
+      if (mounted) {
+        setState(() {
+          _notifications = items;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('ApiException(401): ', '').replaceAll('ApiException(500): ', '');
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _deleteItem(NotificationItem item) async {
     if (item.id == null) return;
-    await NotificationDatabase().delete(item.id!);
-    setState(() => _notifications.removeWhere((n) => n.id == item.id));
+    try {
+      await ApiService().deleteNotification(item.id!);
+      setState(() => _notifications.removeWhere((n) => n.id == item.id));
+    } catch (e) {
+      debugPrint('Delete notification item error: $e');
+    }
   }
 
   Future<void> _deleteAll() async {
@@ -44,9 +72,27 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
         ],
       ),
     );
+    
     if (confirm == true) {
-      await NotificationDatabase().deleteAll();
-      setState(() => _notifications.clear());
+      setState(() => _isLoading = true);
+      try {
+        for (var notif in _notifications) {
+          if (notif.id != null) {
+            await ApiService().deleteNotification(notif.id!);
+          }
+        }
+        setState(() {
+          _notifications.clear();
+          _isLoading = false;
+        });
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Gagal menghapus semua notifikasi. Coba lagi.';
+            _isLoading = false;
+          });
+        }
+      }
     }
   }
 
@@ -74,8 +120,8 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
     final now = DateTime.now();
     final diff = now.difference(dt);
     if (diff.inMinutes < 1) return 'Baru saja';
-    if (diff.inHours < 1) return '${diff.inMinutes} menit lalu';
-    if (diff.inDays < 1) return '${diff.inHours} jam lalu';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} menit lalu';
+    if (diff.inHours < 24) return '${diff.inHours} jam lalu';
     if (diff.inDays == 1) return 'Kemarin';
     return DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(dt);
   }
@@ -98,16 +144,54 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-                : _notifications.isEmpty
-                    ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.notifications_none_rounded, color: AppTheme.textMuted, size: 64),
-                        const SizedBox(height: 12),
-                        Text('Belum ada notifikasi', style: AppTheme.body),
-                      ]))
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                        itemCount: _notifications.length,
-                        itemBuilder: (ctx, i) => _buildCard(_notifications[i]),
+                : _errorMessage.isNotEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.wifi_off_rounded, color: AppTheme.error, size: 64),
+                              const SizedBox(height: 12),
+                              Text(_errorMessage, style: AppTheme.body, textAlign: TextAlign.center),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadNotifications,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primary,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                ),
+                                child: Text('Coba Lagi', style: AppTheme.body.copyWith(fontWeight: FontWeight.bold)),
+                              )
+                            ],
+                          ),
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadNotifications,
+                        color: AppTheme.primary,
+                        backgroundColor: AppTheme.bgDarkPurple,
+                        child: _notifications.isEmpty
+                            ? ListView(
+                                children: [
+                                  SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                                  Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.notifications_none_rounded, color: AppTheme.textMuted, size: 64),
+                                        const SizedBox(height: 12),
+                                        Text('Belum ada notifikasi', style: AppTheme.body),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                                itemCount: _notifications.length,
+                                itemBuilder: (ctx, i) => _buildCard(_notifications[i]),
+                              ),
                       ),
           ),
         ]),

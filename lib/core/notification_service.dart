@@ -90,6 +90,12 @@ class NotificationService {
       debugPrint('FCM Token: $token');
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyFcmToken, token);
+      
+      // Kirim token ke server jika user sudah login (berguna untuk sinkronisasi ulang saat startup)
+      final authToken = prefs.getString('auth_token') ?? '';
+      if (authToken.isNotEmpty) {
+        await _sendTokenToServer(token);
+      }
     }
 
     // Refresh token otomatis — langsung kirim ke server
@@ -98,8 +104,8 @@ class NotificationService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyFcmToken, newToken);
       // Kirim token baru ke server jika user sudah login
-      final idSiswa = prefs.getString('id_siswa') ?? '';
-      if (idSiswa.isNotEmpty) {
+      final authToken = prefs.getString('auth_token') ?? '';
+      if (authToken.isNotEmpty) {
         await _sendTokenToServer(newToken);
       }
     });
@@ -127,7 +133,20 @@ class NotificationService {
   // Ambil FCM token yang tersimpan
   Future<String?> getFcmToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyFcmToken);
+    String? token = prefs.getString(_keyFcmToken);
+    
+    // Jika kosong di shared preferences, coba ambil langsung dari Firebase
+    if (token == null || token.isEmpty) {
+      try {
+        token = await _fcm.getToken();
+        if (token != null) {
+          await prefs.setString(_keyFcmToken, token);
+        }
+      } catch (e) {
+        debugPrint('Error getting FCM token directly: $e');
+      }
+    }
+    return token;
   }
 
   // Kirim FCM token ke server

@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import 'notification_database.dart';
 
 /// Wrapper tipis di atas SharedPreferences untuk data session.
 /// Semua operasi login/logout sekarang dilakukan via ApiService.
@@ -67,5 +68,11 @@ class SessionManager {
     debugPrint('logoutUser called');
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    try {
+      await NotificationDatabase().deleteAll();
+      debugPrint('Local SQLite notification history cleared successfully on logoutUser');
+    } catch (e) {
+      debugPrint('Failed to clear local notification history: $e');
+    }
   }
 }

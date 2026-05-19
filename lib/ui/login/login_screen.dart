@@ -110,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         // Kirim FCM token ke server
         final fcmToken = await NotificationService().getFcmToken();
         if (fcmToken != null && fcmToken.isNotEmpty) {
-          ApiService().saveFcmToken(fcmToken);
+          await ApiService().saveFcmToken(fcmToken);
         }
 
         if (!mounted) return;

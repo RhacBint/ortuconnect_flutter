@@ -32,9 +32,11 @@ class _KalenderScreenState extends State<KalenderScreen> {
   }
 
   Future<void> _fetchAgenda(int month, int year) async {
+    if (!mounted) return;
     setState(() { _isLoading = true; _errorMessage = ''; });
     try {
       final res = await ApiService().getAgenda(month, year);
+      if (!mounted) return;
       if (res['success'] == true) {
         final raw = res['data'];
         List<dynamic> data = [];
@@ -66,10 +68,14 @@ class _KalenderScreenState extends State<KalenderScreen> {
         setState(() { _agendaList = []; _errorMessage = 'Tidak ada agenda di bulan ini'; });
       }
     } on ApiException catch (e) {
+      if (!mounted) return;
       setState(() { _agendaList = []; _errorMessage = e.message; });
     } catch (e) {
+      if (!mounted) return;
       setState(() { _agendaList = []; _errorMessage = 'Gagal memuat agenda. Periksa koneksi.'; });
-    } finally { setState(() => _isLoading = false); }
+    } finally { 
+      if (mounted) setState(() => _isLoading = false); 
+    }
   }
 
   String _formatTanggal(String s) {

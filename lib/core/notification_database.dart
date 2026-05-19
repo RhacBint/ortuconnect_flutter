@@ -35,6 +35,17 @@ class NotificationItem {
     timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp']),
     isRead: map['is_read'] == 1,
   );
+
+  factory NotificationItem.fromJson(Map<String, dynamic> json) => NotificationItem(
+    id: json['id'],
+    title: json['title'] ?? '',
+    body: json['body'] ?? '',
+    type: json['type'] ?? 'pesan',
+    timestamp: json['created_at'] != null 
+        ? (DateTime.tryParse(json['created_at'])?.toLocal() ?? DateTime.now())
+        : DateTime.now(),
+    isRead: json['is_read'] == true,
+  );
 }
 
 class NotificationDatabase {

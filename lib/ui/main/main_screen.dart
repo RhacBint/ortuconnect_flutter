@@ -7,6 +7,8 @@ import '../perizinan/perizinan_screen.dart';
 import '../profile/profile_screen.dart';
 import '../notifikasi/notifikasi_screen.dart';
 import '../../core/notification_database.dart';
+import '../../core/notification_service.dart';
+import '../../core/api_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -34,11 +36,29 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _loadUnreadCount();
+    _syncFcmToken();
   }
 
   Future<void> _loadUnreadCount() async {
-    final count = await NotificationDatabase().getUnreadCount();
-    if (mounted) setState(() => _unreadCount = count);
+    try {
+      final items = await ApiService().getNotifications();
+      final count = items.where((item) => !item.isRead).length;
+      if (mounted) setState(() => _unreadCount = count);
+    } catch (e) {
+      debugPrint('Load unread count error: $e');
+    }
+  }
+
+  Future<void> _syncFcmToken() async {
+    try {
+      final fcmToken = await NotificationService().getFcmToken();
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        await ApiService().saveFcmToken(fcmToken);
+        debugPrint('FCM Token synced on MainScreen init');
+      }
+    } catch (e) {
+      debugPrint('Error syncing FCM Token on MainScreen: $e');
+    }
   }
 
   void _onItemTapped(int index) {
