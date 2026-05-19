@@ -17,7 +17,7 @@ class KalenderScreen extends StatefulWidget {
   State<KalenderScreen> createState() => _KalenderScreenState();
 }
 
-class _KalenderScreenState extends State<KalenderScreen> {
+class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObserver {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   bool _isLoading = false;
@@ -27,8 +27,22 @@ class _KalenderScreenState extends State<KalenderScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedDay = _focusedDay;
     _fetchAgenda(_focusedDay.month, _focusedDay.year);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _fetchAgenda(_focusedDay.month, _focusedDay.year);
+    }
   }
 
   Future<void> _fetchAgenda(int month, int year) async {
@@ -141,19 +155,35 @@ class _KalenderScreenState extends State<KalenderScreen> {
             const SizedBox(height: 16),
             // Agenda list
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-                  : _agendaList.isEmpty
-                      ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.event_busy_rounded, color: AppTheme.textMuted, size: 56),
-                          const SizedBox(height: 12),
-                          Text(_errorMessage, style: AppTheme.body, textAlign: TextAlign.center),
-                        ]))
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          itemCount: _agendaList.length,
-                          itemBuilder: (ctx, i) => _buildAgendaCard(_agendaList[i]),
-                        ),
+              child: RefreshIndicator(
+                onRefresh: () => _fetchAgenda(_focusedDay.month, _focusedDay.year),
+                color: AppTheme.accent,
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+                    : _agendaList.isEmpty
+                        ? SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: SizedBox(
+                              height: 300,
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.event_busy_rounded, color: AppTheme.textMuted, size: 56),
+                                    const SizedBox(height: 12),
+                                    Text(_errorMessage, style: AppTheme.body, textAlign: TextAlign.center),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            itemCount: _agendaList.length,
+                            itemBuilder: (ctx, i) => _buildAgendaCard(_agendaList[i]),
+                          ),
+              ),
             ),
           ],
         ),

@@ -8,10 +8,7 @@ import '../../core/api_service.dart';
 class DashboardScreen extends StatefulWidget {
   final Function(int) onNavigate;
 
-  const DashboardScreen({
-    super.key,
-    required this.onNavigate,
-  });
+  const DashboardScreen({super.key, required this.onNavigate});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -76,9 +73,17 @@ class _DashboardScreenState extends State<DashboardScreen>
         _kehadiranStatus = 'Hadir: $hadir/$total hari';
       }
       _parseIzin(data['izin_terbaru']);
-      if (mounted) setState(() { _isLoading = false; _errorMessage = null; });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _errorMessage = null;
+        });
     } on ApiException catch (e) {
-      if (e.isUnauthorized) _logout(); else _setError(e.message);
+      if (e.isUnauthorized) {
+        _logout();
+      } else {
+        _setError(e.message);
+      }
     } catch (e) {
       _setError('Gagal memuat dashboard. Tarik ke bawah untuk refresh.');
     }
@@ -89,9 +94,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     _agendaDate = '';
     if (raw == null) return;
     List<dynamic> list;
-    if (raw is List) { list = raw; }
-    else if (raw is Map) { list = raw.values.toList(); }
-    else { return; }
+    if (raw is List) {
+      list = raw;
+    } else if (raw is Map) {
+      list = raw.values.toList();
+    } else {
+      return;
+    }
     if (list.isEmpty) return;
     final now = DateTime.now();
     Map<String, dynamic>? upcoming;
@@ -104,7 +113,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (dt == null) continue;
       if (!dt.isBefore(DateTime(now.year, now.month, now.day))) {
         final diff = dt.difference(now);
-        if (closest == null || diff < closest) { closest = diff; upcoming = item; }
+        if (closest == null || diff < closest) {
+          closest = diff;
+          upcoming = item;
+        }
       }
     }
     if (upcoming != null) {
@@ -117,8 +129,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     _izinStatus = 'Belum ada izin terbaru';
     if (raw == null) return;
     Map<String, dynamic>? izin;
-    if (raw is Map<String, dynamic>) { izin = raw; }
-    else if (raw is List && raw.isNotEmpty && raw.first is Map<String, dynamic>) {
+    if (raw is Map<String, dynamic>) {
+      izin = raw;
+    } else if (raw is List &&
+        raw.isNotEmpty &&
+        raw.first is Map<String, dynamic>) {
       izin = raw.first as Map<String, dynamic>;
     }
     if (izin != null) {
@@ -127,32 +142,47 @@ class _DashboardScreenState extends State<DashboardScreen>
       final tgl = izin['tanggal_pengajuan']?.toString() ?? '';
       final sb = StringBuffer(status.isEmpty ? 'Menunggu' : status);
       if (jenis.isNotEmpty) sb.write(' ($jenis)');
-      if (tgl.isNotEmpty && !tgl.contains('0000')) sb.write('\n${_formatTanggal(tgl.split(' ')[0])}');
+      if (tgl.isNotEmpty && !tgl.contains('0000'))
+        sb.write('\n${_formatTanggal(tgl.split(' ')[0])}');
       _izinStatus = sb.toString();
     }
   }
 
   DateTime? _parseDate(String s) {
     for (final f in ['yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd', 'dd-MM-yyyy']) {
-      try { return DateFormat(f).parse(s); } catch (_) {}
+      try {
+        return DateFormat(f).parse(s);
+      } catch (_) {}
     }
     return null;
   }
 
   String _formatTanggal(String s) {
-    try { return DateFormat('dd MMMM yyyy', 'id_ID').format(DateFormat('yyyy-MM-dd').parse(s.trim())); }
-    catch (_) { return s; }
+    try {
+      return DateFormat(
+        'dd MMMM yyyy',
+        'id_ID',
+      ).format(DateFormat('yyyy-MM-dd').parse(s.trim()));
+    } catch (_) {
+      return s;
+    }
   }
 
   void _setError(String msg) {
-    if (mounted) setState(() { _isLoading = false; _errorMessage = msg; });
+    if (mounted)
+      setState(() {
+        _isLoading = false;
+        _errorMessage = msg;
+      });
   }
 
   Future<void> _logout() async {
     await ApiService().logout();
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
   }
 
   @override
@@ -171,8 +201,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                 onRefresh: _loadDashboard,
                 color: AppTheme.accent,
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-                    : _errorMessage != null ? _buildErrorView() : _buildContent(),
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppTheme.primary,
+                        ),
+                      )
+                    : _errorMessage != null
+                    ? _buildErrorView()
+                    : _buildContent(),
               ),
             ),
           ],
@@ -184,16 +220,34 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildErrorView() {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      child: SizedBox(height: 400, child: Center(child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.info_outline, color: AppTheme.textMuted, size: 48),
-          const SizedBox(height: 16),
-          Text(_errorMessage!, style: AppTheme.body, textAlign: TextAlign.center),
-          TextButton(onPressed: _loadDashboard,
-            child: Text('Coba Lagi', style: AppTheme.bodyLarge.copyWith(color: AppTheme.primary))),
-        ],
-      ))),
+      child: SizedBox(
+        height: 400,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.info_outline,
+                color: AppTheme.textMuted,
+                size: 48,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                style: AppTheme.body,
+                textAlign: TextAlign.center,
+              ),
+              TextButton(
+                onPressed: _loadDashboard,
+                child: Text(
+                  'Coba Lagi',
+                  style: AppTheme.bodyLarge.copyWith(color: AppTheme.primary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -201,81 +255,126 @@ class _DashboardScreenState extends State<DashboardScreen>
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      child: Column(children: [
-        // Navigasi ke Profil (Index 5)
-        InkWell(
-          onTap: () => widget.onNavigate(5),
-          borderRadius: BorderRadius.circular(24),
-          child: _buildProfileCard(),
-        ),
-        const SizedBox(height: 14),
-        // Navigasi ke Kalender (Index 3)
-        InkWell(
-          onTap: () => widget.onNavigate(3),
-          borderRadius: BorderRadius.circular(24),
-          child: _buildAgendaCard(),
-        ),
-        const SizedBox(height: 14),
-        // Navigasi ke Absensi (Index 1)
-        InkWell(
-          onTap: () => widget.onNavigate(1),
-          borderRadius: BorderRadius.circular(24),
-          child: _buildKehadiranCard(),
-        ),
-        const SizedBox(height: 14),
-        // Navigasi ke Perizinan (Index 2)
-        InkWell(
-          onTap: () => widget.onNavigate(2),
-          borderRadius: BorderRadius.circular(24),
-          child: _buildStatusIzinCard(),
-        ),
-        const SizedBox(height: 100),
-      ]),
+      child: Column(
+        children: [
+          // Navigasi ke Profil (Index 5)
+          InkWell(
+            onTap: () => widget.onNavigate(5),
+            borderRadius: BorderRadius.circular(24),
+            child: _buildProfileCard(),
+          ),
+          const SizedBox(height: 14),
+          // Navigasi ke Kalender (Index 3)
+          InkWell(
+            onTap: () => widget.onNavigate(3),
+            borderRadius: BorderRadius.circular(24),
+            child: _buildAgendaCard(),
+          ),
+          const SizedBox(height: 14),
+          // Navigasi ke Absensi (Index 1)
+          InkWell(
+            onTap: () => widget.onNavigate(1),
+            borderRadius: BorderRadius.circular(24),
+            child: _buildKehadiranCard(),
+          ),
+          const SizedBox(height: 14),
+          // Navigasi ke Perizinan (Index 2)
+          InkWell(
+            onTap: () => widget.onNavigate(2),
+            borderRadius: BorderRadius.circular(24),
+            child: _buildStatusIzinCard(),
+          ),
+          const SizedBox(height: 100),
+        ],
+      ),
     );
   }
 
   Widget _buildProfileCard() {
-    final genderAsset = _genderIcon == 'cewe' ? 'assets/images/icon_cewe.png' : 'assets/images/icon_cowo.png';
+    final genderAsset = _genderIcon == 'cewe'
+        ? 'assets/images/icon_cewe.png'
+        : 'assets/images/icon_cowo.png';
     return GlassCard(
-      borderRadius: 24, padding: const EdgeInsets.all(16),
-      glowShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.15), blurRadius: 24, offset: const Offset(0, 8))],
-      child: Row(children: [
-        Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4), width: 2),
-            boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.25), blurRadius: 16)],
-          ),
-          child: CircleAvatar(radius: 32,
-            backgroundImage: _fotoUrl.isNotEmpty ? NetworkImage(_fotoUrl) as ImageProvider : AssetImage(genderAsset)),
+      borderRadius: 24,
+      padding: const EdgeInsets.all(16),
+      glowShadow: [
+        BoxShadow(
+          color: AppTheme.primary.withValues(alpha: 0.15),
+          blurRadius: 24,
+          offset: const Offset(0, 8),
         ),
-        const SizedBox(width: 16),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('PROFIL SISWA', style: AppTheme.label.copyWith(fontSize: 9, color: AppTheme.textMuted, letterSpacing: 1.0)),
-          const SizedBox(height: 2),
-          Text(_namaSiswa, style: AppTheme.heading3),
-          const SizedBox(height: 6),
+      ],
+      child: Row(
+        children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
-            ),
-            child: Text(
-              _kelas.isNotEmpty ? _kelas.toUpperCase() : 'KELAS',
-              style: AppTheme.label.copyWith(
-                color: AppTheme.primary,
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppTheme.primary.withValues(alpha: 0.4),
+                width: 2,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primary.withValues(alpha: 0.25),
+                  blurRadius: 16,
+                ),
+              ],
+            ),
+            child: CircleAvatar(
+              radius: 32,
+              backgroundImage: _fotoUrl.isNotEmpty
+                  ? NetworkImage(_fotoUrl) as ImageProvider
+                  : AssetImage(genderAsset),
             ),
           ),
-        ])),
-        // Ikon navigasi tambahan agar konsisten dengan design premium
-        Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted.withValues(alpha: 0.5)),
-      ]),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PROFIL SISWA',
+                  style: AppTheme.label.copyWith(
+                    fontSize: 9,
+                    color: AppTheme.textMuted,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(_namaSiswa, style: AppTheme.heading3),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: AppTheme.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Text(
+                    _kelas.isNotEmpty ? _kelas.toUpperCase() : 'KELAS',
+                    style: AppTheme.label.copyWith(
+                      color: AppTheme.primary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Ikon navigasi tambahan agar konsisten dengan design premium
+          Icon(
+            Icons.chevron_right_rounded,
+            color: AppTheme.textMuted.withValues(alpha: 0.5),
+          ),
+        ],
+      ),
     );
   }
 
@@ -289,14 +388,27 @@ class _DashboardScreenState extends State<DashboardScreen>
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.calendar_today_outlined, color: AppTheme.primary, size: 24),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.calendar_today_outlined,
+                  color: AppTheme.primary,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text('Agenda Mendatang', style: AppTheme.heading3.copyWith(fontSize: 18)),
+                child: Text(
+                  'Agenda Mendatang',
+                  style: AppTheme.heading3.copyWith(fontSize: 18),
+                ),
               ),
-              Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted.withValues(alpha: 0.5)),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.textMuted.withValues(alpha: 0.5),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -315,9 +427,23 @@ class _DashboardScreenState extends State<DashboardScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('JUDUL KEGIATAN', style: AppTheme.label.copyWith(fontSize: 9, color: AppTheme.textMuted)),
+                      Text(
+                        'JUDUL KEGIATAN',
+                        style: AppTheme.label.copyWith(
+                          fontSize: 9,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text(_agendaTitle, style: AppTheme.bodyLarge.copyWith(color: AppTheme.primary, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(
+                        _agendaTitle,
+                        style: AppTheme.bodyLarge.copyWith(
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
@@ -325,9 +451,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('WAKTU', style: AppTheme.label.copyWith(fontSize: 9, color: AppTheme.textMuted)),
+                    Text(
+                      'WAKTU',
+                      style: AppTheme.label.copyWith(
+                        fontSize: 9,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(_agendaDate.isNotEmpty ? _agendaDate : '-', style: AppTheme.bodyLarge),
+                    Text(
+                      _agendaDate.isNotEmpty ? _agendaDate : '-',
+                      style: AppTheme.bodyLarge,
+                    ),
                   ],
                 ),
               ],
@@ -351,9 +486,22 @@ class _DashboardScreenState extends State<DashboardScreen>
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('ABSENSI PEKAN INI', style: AppTheme.label.copyWith(color: AppTheme.textMuted, fontSize: 10, letterSpacing: 1.0)),
+                  Text(
+                    'ABSENSI PEKAN INI',
+                    style: AppTheme.label.copyWith(
+                      color: AppTheme.textMuted,
+                      fontSize: 10,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(_kehadiranStatus, style: AppTheme.heading2.copyWith(color: AppTheme.indigo, fontSize: 24)),
+                  Text(
+                    _kehadiranStatus,
+                    style: AppTheme.heading2.copyWith(
+                      color: AppTheme.indigo,
+                      fontSize: 24,
+                    ),
+                  ),
                 ],
               ),
               // Circular Progress
@@ -369,7 +517,15 @@ class _DashboardScreenState extends State<DashboardScreen>
                       backgroundColor: Colors.white.withValues(alpha: 0.05),
                       color: AppTheme.indigo,
                     ),
-                    Center(child: Text("80%", style: AppTheme.label.copyWith(fontWeight: FontWeight.bold, fontSize: 10))),
+                    Center(
+                      child: Text(
+                        "80%",
+                        style: AppTheme.label.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -393,7 +549,13 @@ class _DashboardScreenState extends State<DashboardScreen>
             }),
           ),
           const SizedBox(height: 12),
-          Text('"Satu hari izin sakit"', style: AppTheme.bodySmall.copyWith(fontStyle: FontStyle.italic, color: AppTheme.textSecondary)),
+          Text(
+            '"Satu hari izin sakit"',
+            style: AppTheme.bodySmall.copyWith(
+              fontStyle: FontStyle.italic,
+              color: AppTheme.textSecondary,
+            ),
+          ),
         ],
       ),
     );
@@ -419,27 +581,49 @@ class _DashboardScreenState extends State<DashboardScreen>
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.fact_check_outlined, color: AppTheme.primary, size: 24),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.fact_check_outlined,
+                  color: AppTheme.primary,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Status Izin', style: AppTheme.heading3.copyWith(fontSize: 18)),
-                    Text('Terakhir', style: AppTheme.heading3.copyWith(fontSize: 18)),
+                    Text(
+                      'Status Izin',
+                      style: AppTheme.heading3.copyWith(fontSize: 18),
+                    ),
+                    Text(
+                      'Terakhir',
+                      style: AppTheme.heading3.copyWith(fontSize: 18),
+                    ),
                   ],
                 ),
               ),
               if (_izinStatus != 'Belum ada izin terbaru')
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(statusOnly, style: AppTheme.label.copyWith(color: statusColor, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    statusOnly,
+                    style: AppTheme.label.copyWith(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -458,15 +642,33 @@ class _DashboardScreenState extends State<DashboardScreen>
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('JENIS PERIZINAN', style: AppTheme.label.copyWith(fontSize: 9, color: AppTheme.textMuted)),
+                    Text(
+                      'JENIS PERIZINAN',
+                      style: AppTheme.label.copyWith(
+                        fontSize: 9,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(_izinStatus.split(' (').first, style: AppTheme.bodyLarge.copyWith(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+                    Text(
+                      _izinStatus.split(' (').first,
+                      style: AppTheme.bodyLarge.copyWith(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('TANGGAL', style: AppTheme.label.copyWith(fontSize: 9, color: AppTheme.textMuted)),
+                    Text(
+                      'TANGGAL',
+                      style: AppTheme.label.copyWith(
+                        fontSize: 9,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text('18 Mei 2024', style: AppTheme.bodyLarge),
                   ],
@@ -480,16 +682,33 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _cardW(String icon, String label, Widget child) {
-    return GlassCard(borderRadius: 24, padding: const EdgeInsets.all(16),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        Container(padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
-            color: AppTheme.primary.withValues(alpha: 0.12)),
-          child: Image.asset(icon, width: 28, height: 28)),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: AppTheme.label), const SizedBox(height: 4), child,
-        ])),
-      ]));
+    return GlassCard(
+      borderRadius: 24,
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: AppTheme.primary.withValues(alpha: 0.12),
+            ),
+            child: Image.asset(icon, width: 28, height: 28),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppTheme.label),
+                const SizedBox(height: 4),
+                child,
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -35,6 +35,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (serverFoto.isNotEmpty) {
           _photoUrl = ApiService.photoUrl(serverFoto);
           await prefs.setString(_keyPhotoUrl, _photoUrl);
+        } else {
+          _photoUrl = '';
+          await prefs.remove(_keyPhotoUrl);
         }
         final gender = data['gender']?.toString().toLowerCase() ?? '';
         await prefs.setString('profile_gender_icon', gender.contains('perempuan') ? 'cewe' : 'cowo');
@@ -51,41 +54,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pickAndUploadPhoto() async {
     final picker = ImagePicker();
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context, backgroundColor: AppTheme.bgDarkPurple,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const SizedBox(height: 8),
-        Container(width: 40, height: 4, decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(2))),
-        const SizedBox(height: 16),
-        Text('Pilih Foto', style: AppTheme.heading3),
-        const SizedBox(height: 8),
-        ListTile(leading: const Icon(Icons.camera_alt_rounded, color: AppTheme.primary),
-          title: Text('Kamera', style: AppTheme.body.copyWith(color: AppTheme.textPrimary)),
-          onTap: () => Navigator.pop(ctx, ImageSource.camera)),
-        ListTile(leading: const Icon(Icons.photo_library_rounded, color: AppTheme.accent),
-          title: Text('Galeri', style: AppTheme.body.copyWith(color: AppTheme.textPrimary)),
-          onTap: () => Navigator.pop(ctx, ImageSource.gallery)),
-        if (_photoUrl.isNotEmpty)
-          ListTile(leading: const Icon(Icons.delete_rounded, color: AppTheme.error),
-            title: Text('Hapus Foto', style: AppTheme.body.copyWith(color: AppTheme.error)),
-            onTap: () => Navigator.pop(ctx, null)),
-        const SizedBox(height: 8),
-      ])),
-    );
-    if (!mounted) return;
-    if (source == null && _photoUrl.isNotEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_keyPhotoUrl);
-      setState(() => _photoUrl = '');
-      return;
-    }
-    if (source == null) return;
-    final picked = await picker.pickImage(source: source, maxWidth: 800, maxHeight: 800, imageQuality: 80);
-    if (picked == null) return;
-    setState(() => _isUploadingPhoto = true);
     try {
+      final action = await showModalBottomSheet<dynamic>(
+        context: context, backgroundColor: AppTheme.bgDarkPurple,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 8),
+          Container(width: 40, height: 4, decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 16),
+          Text('Pilih Foto', style: AppTheme.heading3),
+          const SizedBox(height: 8),
+          ListTile(leading: const Icon(Icons.camera_alt_rounded, color: AppTheme.primary),
+            title: Text('Kamera', style: AppTheme.body.copyWith(color: AppTheme.textPrimary)),
+            onTap: () => Navigator.pop(ctx, ImageSource.camera)),
+          ListTile(leading: const Icon(Icons.photo_library_rounded, color: AppTheme.accent),
+            title: Text('Galeri', style: AppTheme.body.copyWith(color: AppTheme.textPrimary)),
+            onTap: () => Navigator.pop(ctx, ImageSource.gallery)),
+          if (_photoUrl.isNotEmpty)
+            ListTile(leading: const Icon(Icons.delete_rounded, color: AppTheme.error),
+              title: Text('Hapus Foto', style: AppTheme.body.copyWith(color: AppTheme.error)),
+              onTap: () => Navigator.pop(ctx, 'delete')),
+          const SizedBox(height: 8),
+        ])),
+      );
+      if (!mounted) return;
+      
+      if (action == 'delete') {
+        setState(() => _isUploadingPhoto = true);
+        final res = await ApiService().deletePhoto();
+        if (res['success'] == true) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove(_keyPhotoUrl);
+          if (mounted) setState(() => _photoUrl = '');
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Foto profil berhasil dihapus', style: AppTheme.body.copyWith(color: Colors.white)),
+              backgroundColor: AppTheme.bgDarkPurple));
+        } else {
+          _showError(res['message']?.toString() ?? 'Gagal menghapus foto');
+        }
+        return;
+      }
+      
+      if (action is! ImageSource) return;
+      final picked = await picker.pickImage(source: action, maxWidth: 800, maxHeight: 800, imageQuality: 80);
+      if (picked == null) return;
+      
+      setState(() => _isUploadingPhoto = true);
       final res = await ApiService().uploadPhoto(picked.path);
       if (res['success'] == true) {
         final data = res['data'] as Map<String, dynamic>?;
@@ -99,10 +114,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Foto profil berhasil diperbarui', style: AppTheme.body.copyWith(color: Colors.white)),
             backgroundColor: AppTheme.bgDarkPurple));
-      } else { _showError(res['message']?.toString() ?? 'Gagal upload foto'); }
-    } on ApiException catch (e) { _showError(e.message); }
-    catch (e) { _showError('Gagal upload foto'); }
-    finally { if (mounted) setState(() => _isUploadingPhoto = false); }
+      } else {
+        _showError(res['message']?.toString() ?? 'Gagal upload foto');
+      }
+    } on ApiException catch (e) {
+      _showError(e.message);
+    } catch (e) {
+      debugPrint('Error pick/upload photo: $e');
+      _showError('Gagal memproses foto');
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
   }
 
   void _showError(String msg) {

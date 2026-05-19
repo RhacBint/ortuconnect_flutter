@@ -98,6 +98,14 @@ class NotificationService {
       }
     }
 
+    // Subscribe ke topic all_users untuk menerima broadcast agenda sekolah
+    try {
+      await _fcm.subscribeToTopic('all_users');
+      debugPrint('FCM: Subscribed to all_users topic');
+    } catch (e) {
+      debugPrint('FCM: Failed to subscribe to topic: $e');
+    }
+
     // Refresh token otomatis — langsung kirim ke server
     _fcm.onTokenRefresh.listen((newToken) async {
       debugPrint('FCM Token refreshed: $newToken');

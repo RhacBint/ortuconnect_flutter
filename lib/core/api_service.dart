@@ -147,6 +147,14 @@ class ApiService {
     return _handle(response);
   }
 
+  /// DELETE /api/delete-photo
+  Future<Map<String, dynamic>> deletePhoto() async {
+    final headers = await _authHeaders();
+    final response = await http.delete(Uri.parse('$baseUrl/delete-photo'), headers: headers)
+        .timeout(const Duration(seconds: 15));
+    return _handle(response);
+  }
+
   /// GET /api/dashboard
   Future<Map<String, dynamic>> getDashboard(String idSiswa) async {
     final headers = await _authHeaders();
@@ -234,11 +242,15 @@ class ApiService {
   Future<void> saveFcmToken(String fcmToken) async {
     try {
       final headers = await _authHeaders();
-      await http.post(
+      debugPrint('saveFcmToken: Mengirim token ke server...');
+      final response = await http.post(
         Uri.parse('$baseUrl/fcm-token'),
         headers: headers,
         body: jsonEncode({'fcm_token': fcmToken}),
       ).timeout(const Duration(seconds: 10));
+      
+      _handle(response);
+      debugPrint('saveFcmToken: Token FCM berhasil disinkronkan ke server.');
     } catch (e) {
       debugPrint('saveFcmToken error: $e');
     }
@@ -248,14 +260,33 @@ class ApiService {
   /// Mengambil semua riwayat notifikasi dari server
   Future<List<NotificationItem>> getNotifications() async {
     final headers = await _authHeaders();
+    debugPrint('getNotifications: Mengirim request ke $baseUrl/notifications');
     final response = await http.get(
       Uri.parse('$baseUrl/notifications'),
       headers: headers,
     ).timeout(const Duration(seconds: 15));
     
+    debugPrint('getNotifications status: ${response.statusCode}');
+    debugPrint('getNotifications body: ${response.body}');
+    
     final body = _handle(response);
     final List data = body['data'] ?? [];
-    return data.map((json) => NotificationItem.fromJson(json)).toList();
+    debugPrint('getNotifications: Jumlah data mentah = ${data.length}');
+    try {
+      final list = data.map((json) {
+        try {
+          return NotificationItem.fromJson(json);
+        } catch (e) {
+          debugPrint('Error parsing NotificationItem JSON: $json, error: $e');
+          rethrow;
+        }
+      }).toList();
+      debugPrint('getNotifications: Berhasil parsing ${list.length} item');
+      return list;
+    } catch (e) {
+      debugPrint('getNotifications list mapping error: $e');
+      rethrow;
+    }
   }
 
   /// PUT /api/notifications/{id}/read
