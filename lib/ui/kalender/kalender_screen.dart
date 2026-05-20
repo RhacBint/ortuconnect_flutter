@@ -23,6 +23,12 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
   bool _isLoading = false;
   String _errorMessage = '';
   List<AgendaItem> _agendaList = [];
+  
+  // Tab Switcher States
+  String _selectedTab = 'upcoming';
+  int _upcomingCount = 0;
+  int _pastCount = 0;
+  List<AgendaItem> _allAgendaList = [];
 
   @override
   void initState() {
@@ -63,33 +69,112 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
           deskripsi: obj['deskripsi']?.toString() ?? '',
         )).toList();
 
-        final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-        tempList.removeWhere((item) {
-          try { return DateFormat('yyyy-MM-dd').parse(item.tanggal).isBefore(today); }
-          catch (_) { return false; }
-        });
         tempList.sort((a, b) {
           try { return DateFormat('yyyy-MM-dd').parse(a.tanggal)
               .compareTo(DateFormat('yyyy-MM-dd').parse(b.tanggal)); }
           catch (_) { return 0; }
         });
 
-        setState(() {
-          _agendaList = tempList;
-          if (_agendaList.isEmpty) _errorMessage = 'Tidak ada kegiatan mendatang di bulan ini';
-        });
+        _allAgendaList = tempList;
+        _filterAgenda();
       } else {
-        setState(() { _agendaList = []; _errorMessage = 'Tidak ada agenda di bulan ini'; });
+        setState(() {
+          _allAgendaList = [];
+          _agendaList = [];
+          _upcomingCount = 0;
+          _pastCount = 0;
+          _errorMessage = 'Tidak ada agenda di bulan ini';
+        });
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() { _agendaList = []; _errorMessage = e.message; });
+      setState(() {
+        _allAgendaList = [];
+        _agendaList = [];
+        _upcomingCount = 0;
+        _pastCount = 0;
+        _errorMessage = e.message;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _agendaList = []; _errorMessage = 'Gagal memuat agenda. Periksa koneksi.'; });
+      setState(() {
+        _allAgendaList = [];
+        _agendaList = [];
+        _upcomingCount = 0;
+        _pastCount = 0;
+        _errorMessage = 'Gagal memuat agenda. Periksa koneksi.';
+      });
     } finally { 
       if (mounted) setState(() => _isLoading = false); 
     }
+  }
+
+  void _filterAgenda() {
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    
+    // Calculate counts
+    _upcomingCount = _allAgendaList.where((item) {
+      try {
+        final date = DateFormat('yyyy-MM-dd').parse(item.tanggal);
+        return !date.isBefore(today);
+      } catch (_) {
+        return false;
+      }
+    }).length;
+    
+    _pastCount = _allAgendaList.length - _upcomingCount;
+    
+    List<AgendaItem> filteredList = [];
+    
+    if (_selectedTab == 'upcoming') {
+      filteredList = _allAgendaList.where((item) {
+        try {
+          final date = DateFormat('yyyy-MM-dd').parse(item.tanggal);
+          return !date.isBefore(today);
+        } catch (_) {
+          return false;
+        }
+      }).toList();
+      
+      // Sort upcoming ascending (soonest first)
+      filteredList.sort((a, b) {
+        try { return DateFormat('yyyy-MM-dd').parse(a.tanggal)
+            .compareTo(DateFormat('yyyy-MM-dd').parse(b.tanggal)); }
+        catch (_) { return 0; }
+      });
+      
+      if (filteredList.isEmpty) {
+        _errorMessage = 'Tidak ada kegiatan mendatang di bulan ini';
+      } else {
+        _errorMessage = '';
+      }
+    } else {
+      filteredList = _allAgendaList.where((item) {
+        try {
+          final date = DateFormat('yyyy-MM-dd').parse(item.tanggal);
+          return date.isBefore(today);
+        } catch (_) {
+          return false;
+        }
+      }).toList();
+      
+      // Sort past descending (newest first)
+      filteredList.sort((a, b) {
+        try { return DateFormat('yyyy-MM-dd').parse(b.tanggal)
+            .compareTo(DateFormat('yyyy-MM-dd').parse(a.tanggal)); }
+        catch (_) { return 0; }
+      });
+      
+      if (filteredList.isEmpty) {
+        _errorMessage = 'Tidak ada riwayat kegiatan di bulan ini';
+      } else {
+        _errorMessage = '';
+      }
+    }
+    
+    setState(() {
+      _agendaList = filteredList;
+    });
   }
 
   String _formatTanggal(String s) {
@@ -152,7 +237,50 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            // Premium Tab Switcher
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildTabButton(
+                        title: 'Mendatang',
+                        count: _upcomingCount,
+                        isActive: _selectedTab == 'upcoming',
+                        onTap: () {
+                          setState(() {
+                            _selectedTab = 'upcoming';
+                            _filterAgenda();
+                          });
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildTabButton(
+                        title: 'Lampau',
+                        count: _pastCount,
+                        isActive: _selectedTab == 'past',
+                        onTap: () {
+                          setState(() {
+                            _selectedTab = 'past';
+                            _filterAgenda();
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             // Agenda list
             Expanded(
               child: RefreshIndicator(
@@ -214,6 +342,71 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
             ],
           ])),
         ]),
+      ),
+    );
+  }
+
+  Widget _buildTabButton({
+    required String title,
+    required int count,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              gradient: isActive ? AppTheme.accentGradient : null,
+              boxShadow: isActive
+                  ? [
+                      BoxShadow(
+                        color: AppTheme.accent.withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      )
+                    ]
+                  : [],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  style: AppTheme.body.copyWith(
+                    color: isActive ? Colors.white : AppTheme.textSecondary,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? Colors.white.withValues(alpha: 0.2)
+                        : Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: AppTheme.label.copyWith(
+                      color: isActive ? Colors.white : AppTheme.textMuted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
