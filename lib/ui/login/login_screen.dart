@@ -14,7 +14,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with TickerProviderStateMixin {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
@@ -47,10 +48,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     );
 
     _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
-    _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.12),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
+    _slideAnim = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
+        .animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
 
     _fadeController.forward();
     _slideController.forward();
@@ -92,20 +93,22 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         }
 
         final idSiswa = data['id_siswa']?.toString() ?? '';
-        final gender  = data['siswa']?['gender']?.toString().toLowerCase() ?? '';
+        final gender = data['siswa']?['gender']?.toString().toLowerCase() ?? '';
 
         await SessionManager().createLoginSession(
-          token:    data['token'].toString(),
+          token: data['token'].toString(),
           username: data['username'].toString(),
-          userId:   data['id_akun'].toString(),
-          role:     data['role'].toString(),
-          idSiswa:  idSiswa,
+          userId: data['id_akun'].toString(),
+          role: data['role'].toString(),
+          idSiswa: idSiswa,
         );
 
         // Simpan gender icon untuk avatar
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('profile_gender_icon',
-            gender.contains('perempuan') ? 'cewe' : 'cowo');
+        await prefs.setString(
+          'profile_gender_icon',
+          gender.contains('perempuan') ? 'cewe' : 'cowo',
+        );
 
         // Kirim FCM token ke server
         final fcmToken = await NotificationService().getFcmToken();
@@ -117,14 +120,17 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const MainScreen(),
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const MainScreen(),
             transitionsBuilder: (context, anim, secondaryAnimation, child) =>
                 FadeTransition(opacity: anim, child: child),
             transitionDuration: const Duration(milliseconds: 500),
           ),
         );
       } else {
-        _showToast(res['message']?.toString() ?? 'Username atau password salah');
+        _showToast(
+          res['message']?.toString() ?? 'Username atau password salah',
+        );
       }
     } on ApiException catch (e) {
       _showToast(e.message);
@@ -141,7 +147,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   void _showToast(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: AppTheme.body.copyWith(color: Colors.white)),
+        content: Text(
+          message,
+          style: AppTheme.body.copyWith(color: Colors.white),
+        ),
         backgroundColor: AppTheme.bgDarkPurple,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -166,7 +175,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 end: Alignment.bottomRight,
                 colors: [
                   Color.lerp(AppTheme.bgDark, const Color(0xFF120825), t)!,
-                  Color.lerp(AppTheme.bgDarkPurple, const Color(0xFF1E0A30), t)!,
+                  Color.lerp(
+                    AppTheme.bgDarkPurple,
+                    const Color(0xFF1E0A30),
+                    t,
+                  )!,
                   Color.lerp(AppTheme.bgDeep, const Color(0xFF150730), t)!,
                 ],
               ),
@@ -180,7 +193,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             SafeArea(
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 24,
+                  ),
                   child: FadeTransition(
                     opacity: _fadeAnim,
                     child: SlideTransition(
@@ -208,22 +224,34 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             Positioned(
               top: -size.height * 0.12 + (t * 18),
               left: -size.width * 0.18,
-              child: _softOrb(size.width * 0.72, AppTheme.primary.withValues(alpha: 0.1)),
+              child: _softOrb(
+                size.width * 0.72,
+                AppTheme.primary.withValues(alpha: 0.1),
+              ),
             ),
             Positioned(
               bottom: -size.height * 0.1 - (t * 14),
               right: -size.width * 0.2,
-              child: _softOrb(size.width * 0.78, AppTheme.accent.withValues(alpha: 0.08)),
+              child: _softOrb(
+                size.width * 0.78,
+                AppTheme.accent.withValues(alpha: 0.08),
+              ),
             ),
             Positioned(
               top: size.height * 0.06 - (t * 12),
               right: -size.width * 0.1,
-              child: _softOrb(size.width * 0.45, AppTheme.indigo.withValues(alpha: 0.1)),
+              child: _softOrb(
+                size.width * 0.45,
+                AppTheme.indigo.withValues(alpha: 0.1),
+              ),
             ),
             Positioned(
               bottom: size.height * 0.18 + (t * 10),
               left: -size.width * 0.12,
-              child: _softOrb(size.width * 0.42, AppTheme.primary.withValues(alpha: 0.08)),
+              child: _softOrb(
+                size.width * 0.42,
+                AppTheme.primary.withValues(alpha: 0.08),
+              ),
             ),
           ],
         );
@@ -284,7 +312,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 const SizedBox(height: 16),
                 _buildTextField(
                   controller: _usernameController,
-                  hint: 'Nomor Siswa',
+                  hint: 'Nomor Murid',
                   icon: Icons.person_outline_rounded,
                 ),
                 const SizedBox(height: 14),
@@ -343,7 +371,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
     );

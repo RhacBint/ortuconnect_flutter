@@ -333,7 +333,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'PROFIL SISWA',
+                  'PROFIL MURID',
                   style: AppTheme.label.copyWith(
                     fontSize: 9,
                     color: AppTheme.textMuted,
