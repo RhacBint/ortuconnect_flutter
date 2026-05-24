@@ -8,25 +8,61 @@ import '../../core/api_service.dart';
 import '../../core/session_manager.dart';
 import '../login/login_screen.dart';
 
+/// Halaman ProfileScreen [StatefulWidget]
+/// 
+/// Fungsi: Menjadi wadah (screen) utama untuk menampilkan informasi profil siswa 
+/// beserta orang tuanya, serta menyediakan fitur pengeditan data dan foto profil.
+/// Alur: Memanggil State [_ProfileScreenState] untuk mengelola siklus hidup widget,
+/// memuat data dari server, dan merender antarmuka pengguna.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
+/// State [_ProfileScreenState] dari [ProfileScreen]
+/// 
+/// Fungsi: Mengelola data profil, proses upload/delete foto, pembaruan profil,
+/// dialog edit, proses logout, dan rendering visual komponen glassmorphism.
 class _ProfileScreenState extends State<ProfileScreen> {
+  // Key SharedPreferences untuk menyimpan URL foto profil secara lokal agar akses lebih cepat.
   static const String _keyPhotoUrl = 'profile_photo_url';
+  
+  // Status loading untuk menampilkan indikator putar (spinner) saat memuat data.
   bool isLoading = true;
+  
+  // Status loading khusus ketika proses upload atau hapus foto sedang berjalan.
   bool _isUploadingPhoto = false;
+  
+  // Map untuk menampung data profil mentah yang diterima dari API Server.
   Map<String, dynamic>? profileData;
+  
+  // Variabel untuk menyimpan URL foto profil aktif siswa.
   String _photoUrl = '';
 
+  /// Fungsi: Inisialisasi State (Siklus hidup widget pertama kali dibuat)
+  /// Alur:
+  /// 1. Memanggil [super.initState()] untuk menjalankan fungsi bawaan Flutter.
+  /// 2. Memanggil [_loadProfile()] secara asinkron untuk mengambil data profil terbaru.
   @override
   void initState() {
     super.initState();
     _loadProfile();
   }
 
+  /// Fungsi: Mengambil data profil dari backend API dan menyimpannya secara lokal.
+  /// Alur:
+  /// 1. Membuka SharedPreferences untuk mengambil foto profil cache lama (jika ada).
+  /// 2. Melakukan request HTTP GET ke server melalui `ApiService().getProfile()`.
+  /// 3. Jika berhasil (`success == true`):
+  ///    - Menyimpan URL foto profil terbaru ke SharedPreferences jika tidak kosong.
+  ///    - Menentukan ikon gender default ('cewe' / 'cowo') dan menyimpannya di SharedPreferences.
+  ///    - Mengupdate `profileData` dan mengubah `isLoading = false` lewat `setState`.
+  /// 4. Jika gagal karena unauthorized (token kedaluwarsa):
+  ///    - Melakukan logout lokal via `SessionManager().logoutUser()`.
+  ///    - Mengarahkan paksa pengguna kembali ke `LoginScreen` dan menghapus seluruh tumpukan halaman.
+  /// 5. Jika error koneksi lainnya: Menghentikan loading spinner agar tidak stuck.
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
     _photoUrl = prefs.getString(_keyPhotoUrl) ?? '';
@@ -47,11 +83,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'profile_gender_icon',
           gender.contains('perempuan') ? 'cewe' : 'cowo',
         );
-        if (mounted)
+        if (mounted) {
           setState(() {
             profileData = data;
             isLoading = false;
           });
+        }
       } else {
         if (mounted) setState(() => isLoading = false);
       }
@@ -72,6 +109,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Fungsi: Menampilkan pilihan sumber gambar dan memproses upload atau penghapusan foto profil.
+  /// Alur:
+  /// 1. Menampilkan BottomSheet kustom berisi 3 opsi: Kamera, Galeri, atau Hapus Foto (jika foto ada).
+  /// 2. Jika opsi 'Hapus Foto' dipilih:
+  ///    - Set `_isUploadingPhoto = true`.
+  ///    - Panggil API `deletePhoto()`.
+  ///    - Hapus cache lokal di SharedPreferences, kosongkan `_photoUrl`, lalu tampilkan SnackBar sukses.
+  /// 3. Jika Kamera/Galeri dipilih:
+  ///    - Buka plugin `ImagePicker` dengan batas kompresi resolusi 800x800 px dan kualitas 80%.
+  ///    - Jika gambar berhasil diambil, set `_isUploadingPhoto = true`.
+  ///    - Panggil API `uploadPhoto()` dengan mengirimkan path berkas gambar.
+  ///    - Jika sukses, update `_photoUrl`, simpan di SharedPreferences, lalu tampilkan SnackBar sukses.
+  /// 4. Selesai memproses, matikan status loading `_isUploadingPhoto = false` lewat `setState`.
   Future<void> _pickAndUploadPhoto() async {
     final picker = ImagePicker();
     final action = await showModalBottomSheet<String>(
@@ -216,6 +266,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Fungsi: Helper untuk memicu dan menampilkan SnackBar pesan kesalahan (error).
+  /// Alur: Menerima String pesan, memvalidasi state mounted, lalu menampilkannya dengan tema merah (AppTheme.error).
   void _showError(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -226,6 +278,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Fungsi: Mengirim pembaruan data biodata profil ke API Server.
+  /// Alur:
+  /// 1. Mengaktifkan loading (`isLoading = true`).
+  /// 2. Melakukan request HTTP PUT/POST melalui `ApiService().updateProfile(updatedData)`.
+  /// 3. Jika berhasil:
+  ///    - Memperbarui preferensi ikon gender lokal berdasarkan input jenis kelamin baru.
+  ///    - Menampilkan pesan sukses berupa SnackBar.
+  ///    - Memanggil kembali [_loadProfile()] untuk menyegarkan data UI dengan data terbaru dari server.
+  /// 4. Jika gagal/error: Menangkap error dan memicu SnackBar pemberitahuan kegagalan.
+  /// 5. Terakhir: Menonaktifkan loading (`isLoading = false`).
   Future<void> _updateProfile(Map<String, String> updatedData) async {
     setState(() => isLoading = true);
     try {
@@ -293,6 +355,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Fungsi: Menampilkan pop-up Dialog formulir untuk mengubah informasi profil.
+  /// Alur:
+  /// 1. Mengambil data profil yang ada lalu menginisialisasi `TextEditingController` untuk setiap input field.
+  /// 2. Membuka dialog menggunakan `showDialog()` dengan layout Form di dalam `AlertDialog`.
+  /// 3. Menggunakan `StatefulBuilder` agar state dialog terisolasi (misal mengganti gender atau tanggal lahir secara interaktif).
+  /// 4. Opsi 'Tanggal Lahir' memicu dialog penanggalan `showDatePicker`.
+  /// 5. Opsi 'Gender' menggunakan Dropdown kustom (Laki-Laki & Perempuan).
+  /// 6. Jika menekan tombol 'Batal': Dialog tertutup.
+  /// 7. Jika menekan tombol 'Simpan': Menutup dialog dan memanggil [_updateProfile()] dengan peta data yang diinput.
   void _showEditDialog() {
     if (profileData == null) return;
     final nameCtrl = TextEditingController(text: profileData!['nama_siswa']);
@@ -334,12 +405,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: child!,
                       ),
                     );
-                    if (pickedDate != null)
+                    if (pickedDate != null) {
                       setDialogState(() {
                         dateCtrl.text = DateFormat(
                           'yyyy-MM-dd',
                         ).format(pickedDate);
                       });
+                    }
                   },
                   child: AbsorbPointer(
                     child: _editField(dateCtrl, "Tanggal Lahir"),
@@ -423,6 +495,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Fungsi: Widget pembantu (helper) untuk membangun kolom teks input yang seragam.
+  /// Alur: Menerima [TextEditingController] dan [String label], merender TextField dengan gaya visual gelap (AppTheme).
   Widget _editField(TextEditingController ctrl, String label) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -445,6 +519,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Fungsi: Menampilkan konfirmasi pop-up dialog untuk keluar/logout dari aplikasi.
+  /// Alur:
+  /// 1. Menampilkan dialog dengan pertanyaan konfirmasi "Yakin ingin keluar?".
+  /// 2. Jika 'Tidak' ditekan: Dialog ditutup.
+  /// 3. Jika 'Ya' ditekan:
+  ///    - Menutup dialog segera agar tidak menumpuk.
+  ///    - Mengamankan instance `Navigator` di variabel lokal demi menghindari "async gap" / BuildContext kedaluwarsa.
+  ///    - Melakukan pemanggilan asinkron `ApiService().logout()` agar server menghapus token FCM yang terdaftar.
+  ///    - Jika berhasil atau gagal: Sistem lokal dibersihkan lewat `SessionManager().logoutUser()` dan dipindahkan ke `LoginScreen`.
   void _logout() {
     showDialog(
       context: context,
@@ -504,6 +587,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Fungsi: Membangun widget foto profil berdesain premium lingkaran (Avatar).
+  /// Parameter: [String genderImagePath] (Path gambar ikon default cewe/cowo jika foto kosong).
+  /// Alur:
+  /// 1. Stack utama berisi:
+  ///    - Lingkaran Avatar utama berpendar bayangan (BoxShadow) berwarna neon ungu.
+  ///    - Logika kondisional:
+  ///      * Jika `_isUploadingPhoto == true`: Merender putaran CircularProgressIndicator.
+  ///      * Jika `_photoUrl` terisi: Merender `Image.network()` dengan fallback ke asset gender jika gagal muat.
+  ///      * Jika kosong: Merender `Image.asset()` gender default langsung.
+  ///    - Tombol Kamera (kanan bawah) untuk memicu `_pickAndUploadPhoto()`.
+  ///    - Tombol Edit (kiri bawah) untuk memicu `_showEditDialog()`.
   Widget _buildAvatar(String genderImagePath) {
     return Stack(
       children: [
@@ -610,6 +704,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Fungsi: Metode rendering UI utama dari layar profil.
+  /// Alur:
+  /// 1. Mengecek status loading. Jika iya, tampilkan Fullscreen loading spinner.
+  /// 2. Menentukan aset gambar avatar default berdasarkan data jenis kelamin (Perempuan -> cewe, Laki-Laki -> cowo).
+  /// 3. Merender struktur layout utama dibungkus `DarkBackground`:
+  ///    - Header Profil (SafeArea): Menampilkan judul "Profile", widget avatar ([_buildAvatar]), nama siswa, dan nama kelas.
+  ///    - Pane Transparan Glassmorphism (Expanded): Menggunakan `BackdropFilter` blur 30px dan latar belakang semi-transparan untuk memberikan efek kaca premium.
+  ///    - Bagian 1 "Identitas Anak": Kartu Info Nama, Alamat, serta Grid Bersebelahan berisi Tanggal Lahir dan Jenis Kelamin.
+  ///    - Bagian 2 "Identitas Orangtua": Kartu Info Nama Orang Tua dan No. Telepon.
+  ///    - Tombol Paling Bawah: OutlinedButton merah tebal untuk memicu `_logout()`.
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -800,6 +904,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Fungsi: Membangun baris judul sub-bagian dengan garis indikator berwarna di sebelah kiri.
+  /// Parameter: [String title] (teks judul), [Color indicatorColor] (warna garis penanda vertikal).
   Widget _buildSectionHeader(String title, Color indicatorColor) {
     return Row(
       children: [
@@ -817,6 +923,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Fungsi: Membangun kartu data baris horizontal dengan ikon di sebelah kiri.
+  /// Parameter:
+  /// - [IconData icon] (Ikon representasi)
+  /// - [String label] (Kategori info seperti "NAMA LENGKAP")
+  /// - [String value] (Nilai informasi dari database)
+  /// - [Color iconColor] (Warna latar & warna ikon, default ungu AppTheme.primary)
   Widget _buildInfoCard(
     IconData icon,
     String label,
@@ -868,6 +980,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Fungsi: Membangun kartu informasi kecil berbentuk grid (kotak) berskala setengah lebar halaman.
+  /// Parameter:
+  /// - [String label] (Kategori info seperti "JENIS KELAMIN")
+  /// - [String value] (Nilai informasi dari database)
   Widget _buildGridCard(String label, String value) {
     return Container(
       padding: const EdgeInsets.all(16),

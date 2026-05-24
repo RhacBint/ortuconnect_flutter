@@ -4,22 +4,41 @@ import '../../core/app_theme.dart';
 import '../../core/api_service.dart';
 import '../login/login_screen.dart';
 
+/// Halaman PerizinanScreen [StatefulWidget]
+/// 
+/// Fungsi: Menyediakan formulir pengajuan izin ketidakhadiran murid (Sakit/Izin) 
+/// bagi orang tua, serta menyajikan riwayat pengajuan izin beserta status approvalnya.
+/// Alur: Memanggil State [_PerizinanScreenState] untuk mengelola form input dan 
+/// memproses data pengajuan izin ke server.
 class PerizinanScreen extends StatefulWidget {
   const PerizinanScreen({super.key});
+
   @override
   State<PerizinanScreen> createState() => _PerizinanScreenState();
 }
 
+/// State [_PerizinanScreenState] dengan [WidgetsBindingObserver]
+/// 
+/// Fungsi: Mengontrol input form (DatePicker, Dropdown, TextArea), memvalidasi tanggal pengajuan,
+/// mengirim data pengajuan ke API, memfilter riwayat izin berdasarkan bulan, dan merender status persetujuan.
+/// Alur: Menggunakan observer siklus hidup aplikasi untuk merefresh otomatis daftar riwayat ketika kembali aktif.
+
+
 class _PerizinanScreenState extends State<PerizinanScreen>
     with WidgetsBindingObserver {
+  // Controller untuk menangkap teks input tanggal & keterangan pengajuan
   final TextEditingController _tglMulaiController = TextEditingController();
   final TextEditingController _tglSelesaiController = TextEditingController();
   final TextEditingController _keteranganController = TextEditingController();
 
+  // Jenis izin default terpilih dan daftar pilihan jenis izin
   String _selectedJenis = 'Sakit';
   final List<String> _jenisIzin = ['Sakit', 'Izin'];
 
+  // Bulan filter default terpilih untuk memilah daftar riwayat
   String _selectedMonthFilter = 'Semua Bulan';
+  
+  // Larik penampung kategori filter bulan
   final List<String> _bulanFilter = [
     'Semua Bulan',
     'Januari',
@@ -36,11 +55,22 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     'Desember',
   ];
 
+  // Status loading data riwayat izin
   bool _isLoading = true;
+  
+  // Status loading saat tombol 'Kirim' ditekan agar mencegah double-tap
   bool _isSubmitting = false;
+  
+  // Penampung pesan kesalahan
   String? _errorMessage;
+  
+  // List riwayat perizinan dari server
   List<dynamic> _riwayatIzin = [];
 
+  /// Fungsi: Inisialisasi awal State perizinan
+  /// Alur:
+  /// 1. Mendaftarkan observer siklus hidup aplikasi.
+  /// 2. Memanggil [_loadRiwayatIzin()] untuk mengambil riwayat dari database server.
   @override
   void initState() {
     super.initState();
@@ -48,6 +78,8 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     _loadRiwayatIzin();
   }
 
+  /// Fungsi: Pembersihan resource controller & state
+  /// Alur: Melepas observer siklus hidup dan mendispose seluruh TextEditingController demi mencegah memori bocor.
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -57,22 +89,32 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     super.dispose();
   }
 
+  /// Fungsi: Callback ketika siklus hidup aplikasi berubah
+  /// Alur: Jika aplikasi kembali aktif di foreground, otomatis memanggil ulang data riwayat izin.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _loadRiwayatIzin();
   }
 
+  /// Fungsi: Mengambil daftar riwayat perizinan murid yang pernah diajukan dari API Server.
+  /// Alur:
+  /// 1. Mengaktifkan loading (`_isLoading = true`).
+  /// 2. Melakukan request HTTP GET melalui `ApiService().getPerizinan()`.
+  /// 3. Jika berhasil: Menyimpan data list ke `_riwayatIzin` dan mematikan loading.
+  /// 4. Jika gagal karena unauthorized: Mengarahkan paksa pengguna ke layar Login.
+  /// 5. Jika gagal karena hal lain: Menyajikan pesan kegagalan ke layar.
   Future<void> _loadRiwayatIzin() async {
     try {
       if (mounted) setState(() => _isLoading = true);
       final res = await ApiService().getPerizinan();
       if (res['success'] == true) {
         _riwayatIzin = (res['data'] as List<dynamic>?) ?? [];
-        if (mounted)
+        if (mounted) {
           setState(() {
             _isLoading = false;
             _errorMessage = null;
           });
+        }
       } else {
         _riwayatIzin = [];
         _setError(res['message']?.toString() ?? 'Tidak ada riwayat perizinan');
@@ -88,6 +130,18 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     }
   }
 
+  /// Fungsi: Mengirimkan form pengajuan izin baru ke API Server.
+  /// Alur:
+  /// 1. Validasi lokal: Tanggal mulai tidak boleh kosong.
+  /// 2. Validasi lokal: Tanggal selesai tidak boleh mendahului tanggal mulai.
+  /// 3. Mengaktifkan status kirim (`_isSubmitting = true`).
+  /// 4. Melakukan request HTTP POST via `ApiService().submitPerizinan()`.
+  /// 5. Jika berhasil:
+  ///    - Menampilkan SnackBar pemberitahuan sukses.
+  ///    - Mengosongkan/clear seluruh form input teks.
+  ///    - Memanggil kembali [_loadRiwayatIzin()] untuk memperbarui tabel riwayat di bawah form.
+  /// 6. Jika gagal: Menangkap error dan menampilkan SnackBar merah bertuliskan pesan kegagalan.
+  /// 7. Terakhir: Menonaktifkan status kirim (`_isSubmitting = false`).
   Future<void> _submitIzin() async {
     final tglMulai = _tglMulaiController.text;
     final tglSelesai = _tglSelesaiController.text;
@@ -135,14 +189,18 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     }
   }
 
+  /// Fungsi: Mengubah state saat terjadi kegagalan muat data.
   void _setError(String msg) {
-    if (mounted)
+    if (mounted) {
       setState(() {
         _isLoading = false;
         _errorMessage = msg;
       });
+    }
   }
 
+  /// Fungsi: Helper untuk menayangkan SnackBar melayang kustom yang elegan.
+  /// Parameter: [String msg] (isi pesan), [bool isError] (jika ya, beri warna merah).
   void _showSnackBar(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -154,6 +212,7 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     );
   }
 
+  /// Fungsi: Mengarahkan paksa pengguna ke LoginScreen jika token kedaluwarsa.
   void _redirectLogin() {
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
@@ -162,6 +221,9 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     );
   }
 
+  /// Fungsi: Menampilkan dialog kalender bawaan untuk memilih tanggal.
+  /// Parameter: [TextEditingController controller] (Controller target untuk diisi hasil pilihan tanggal).
+  /// Alur: Membuka `showDatePicker` bertema gelap, lalu memformat tanggal yang dipilih menjadi 'yyyy-MM-dd' untuk database.
   Future<void> _selectDate(TextEditingController controller) async {
     final picked = await showDatePicker(
       context: context,
@@ -179,10 +241,19 @@ class _PerizinanScreenState extends State<PerizinanScreen>
         child: child!,
       ),
     );
-    if (picked != null)
+    if (picked != null) {
       controller.text = DateFormat('yyyy-MM-dd').format(picked);
+    }
   }
 
+  /// Fungsi: Metode render UI utama layar perizinan.
+  /// Alur:
+  /// 1. Halaman dibungkus dalam `DarkBackground` premium.
+  /// 2. Bagian Atas: Header bertuliskan "Perizinan Murid".
+  /// 3. Bagian Body (`SingleChildScrollView` + `RefreshIndicator`):
+  ///    - Form Input Baru ([_buildFormCard()]): Panel kaca transparan berisi pilihan tanggal, jenis izin, dan tombol kirim.
+  ///    - Header Riwayat ([_buildHistoryHeader()]): Judul riwayat berdampingan dengan Dropdown penyaring bulan.
+  ///    - Daftar Riwayat ([_buildRiwayatList()]): Susunan kartu perizinan siswa.
   @override
   Widget build(BuildContext context) {
     return DarkBackground(
@@ -222,6 +293,8 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     );
   }
 
+  /// Fungsi: Membangun kartu form input pengajuan izin baru bergaya kaca premium.
+  /// Alur: Menyusun input tanggal mulai/selesai berdampingan, dropdown jenis izin, kolom deskripsi alasan, dan tombol kirim bergradien.
   Widget _buildFormCard() {
     return GlassCard(
       borderRadius: 20,
@@ -267,6 +340,7 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     );
   }
 
+  /// Fungsi: Membuat input field aspal (Tap-detector) khusus tanggal yang membuka kalender ketika disentuh.
   Widget _buildDateField(String label, TextEditingController controller) {
     return GestureDetector(
       onTap: () => _selectDate(controller),
@@ -302,6 +376,7 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     );
   }
 
+  /// Fungsi: Membangun pilihan dropdown bergaya gelap premium untuk jenis izin.
   Widget _buildDropdown() {
     return Container(
       decoration: BoxDecoration(
@@ -327,6 +402,7 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     );
   }
 
+  /// Fungsi: Membangun kolom area teks masukan berbaris banyak (max 3 baris) untuk keterangan alasan izin.
   Widget _buildTextArea() {
     return Container(
       decoration: BoxDecoration(
@@ -349,6 +425,7 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     );
   }
 
+  /// Fungsi: Rangkaian tajuk bagian riwayat yang berisi dropdown filter penyaring bulan.
   Widget _buildHistoryHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -380,6 +457,12 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     );
   }
 
+  /// Fungsi: Memproses list riwayat izin dan memfilternya secara asinkron berdasarkan dropdown bulan aktif.
+  /// Alur:
+  /// 1. Jika masih loading, tampilkan putaran progres.
+  /// 2. Memfilter `_riwayatIzin` berdasarkan kesamaan bulan dari string 'tanggal_mulai' dengan filter terpilih.
+  /// 3. Jika hasil filter kosong, tampilkan pesan informatif "Tidak ada data".
+  /// 4. Jika ada, susun riwayat menggunakan ListView builder yang memanggil [_buildIzinCard()] untuk setiap item.
   Widget _buildRiwayatList() {
     if (_isLoading) {
       return const Center(
@@ -425,6 +508,14 @@ class _PerizinanScreenState extends State<PerizinanScreen>
     );
   }
 
+  /// Fungsi: Membuat kartu riwayat izin tunggal dengan panel ekspansi detail (ExpansionTile) di dalam `GlassCard`.
+  /// Parameter: [Map<String, dynamic> item] (Data peta entitas pengajuan izin).
+  /// Alur:
+  /// 1. Mengidentifikasi status (Menunggu, Disetujui, Ditolak).
+  /// 2. Menentukan warna status (Setuju -> Hijau success, Tunggu -> Kuning warning, Tolak -> Merah error).
+  /// 3. Merender judul berupa rentang tanggal dan subtitle jenis izin.
+  /// 4. Menyediakan kontainer *badge* status di sebelah kanan.
+  /// 5. Ketika kartu di-tap (diekspansi), akan slide-down menyajikan rincian teks alasan dari orang tua, serta alasan penolakan guru jika pengajuan tersebut ditolak.
   Widget _buildIzinCard(Map<String, dynamic> item) {
     final status = (item['status'] ?? 'Menunggu').toString();
     final tglMulai = item['tanggal_mulai']?.toString() ?? '-';
@@ -436,12 +527,15 @@ class _PerizinanScreenState extends State<PerizinanScreen>
 
     Color statusColor = AppTheme.textMuted;
     final sl = status.toLowerCase();
-    if (sl.contains('setuju') || sl.contains('disetujui'))
+    if (sl.contains('setuju') || sl.contains('disetujui')) {
       statusColor = AppTheme.success;
-    if (sl.contains('tunggu') || sl.contains('menunggu'))
+    }
+    if (sl.contains('tunggu') || sl.contains('menunggu')) {
       statusColor = AppTheme.warning;
-    if (sl.contains('tolak') || sl.contains('ditolak'))
+    }
+    if (sl.contains('tolak') || sl.contains('ditolak')) {
       statusColor = AppTheme.error;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

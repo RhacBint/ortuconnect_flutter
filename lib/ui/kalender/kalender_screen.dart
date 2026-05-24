@@ -4,6 +4,10 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../core/app_theme.dart';
 import '../../core/api_service.dart';
 
+/// Model Data [AgendaItem]
+/// 
+/// Fungsi: Merepresentasikan objek data tunggal dari suatu agenda/kegiatan sekolah.
+/// Atribut: nama kegiatan, tanggal, dan deskripsi kegiatan.
 class AgendaItem {
   final String namaKegiatan;
   final String tanggal;
@@ -11,25 +15,56 @@ class AgendaItem {
   AgendaItem({required this.namaKegiatan, required this.tanggal, required this.deskripsi});
 }
 
+/// Halaman KalenderScreen [StatefulWidget]
+/// 
+/// Fungsi: Menampilkan kalender kegiatan interaktif bulanan serta daftar agenda sekolah.
+/// Alur: Memanggil State [_KalenderScreenState] untuk memuat agenda berdasarkan bulan & tahun kalender aktif.
 class KalenderScreen extends StatefulWidget {
   const KalenderScreen({super.key});
+
   @override
   State<KalenderScreen> createState() => _KalenderScreenState();
 }
 
+/// State [_KalenderScreenState] dengan [WidgetsBindingObserver]
+/// 
+/// Fungsi: Mengelola TableCalendar, memilah agenda mendatang/lampau,
+/// memperbarui jumlah badge, dan merender kartu agenda (*GlassCard*).
+/// Alur: Memantau siklus hidup aplikasi. Ketika kembali aktif (*resumed*),
+/// ia otomatis melakukan *fetch* ulang untuk memastikan data agenda up-to-date.
 class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObserver {
+  // Tanggal yang sedang ditampilkan di kalender
   DateTime _focusedDay = DateTime.now();
+  
+  // Tanggal yang dipilih oleh pengguna di grid kalender
   DateTime? _selectedDay;
+  
+  // Status loading untuk mengambil data agenda
   bool _isLoading = false;
+  
+  // Pesan error jika gagal memuat data
   String _errorMessage = '';
+  
+  // List agenda terfilter yang akan ditampilkan di layar
   List<AgendaItem> _agendaList = [];
   
-  // Tab Switcher States
+  // Tab terpilih untuk filter daftar kegiatan ('upcoming' / 'past')
   String _selectedTab = 'upcoming';
+  
+  // Akumulasi jumlah kegiatan mendatang di bulan aktif
   int _upcomingCount = 0;
+  
+  // Akumulasi jumlah kegiatan lampau di bulan aktif
   int _pastCount = 0;
+  
+  // Seluruh daftar kegiatan di bulan aktif (belum terfilter)
   List<AgendaItem> _allAgendaList = [];
 
+  /// Fungsi: Inisialisasi awal State kalender
+  /// Alur:
+  /// 1. Menambahkan observer siklus hidup aplikasi.
+  /// 2. Mengatur tanggal default terpilih ke hari ini.
+  /// 3. Memanggil [_fetchAgenda()] untuk bulan & tahun saat ini.
   @override
   void initState() {
     super.initState();
@@ -38,12 +73,16 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
     _fetchAgenda(_focusedDay.month, _focusedDay.year);
   }
 
+  /// Fungsi: Pembersihan resource State
+  /// Alur: Melepas observer siklus hidup aplikasi.
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  /// Fungsi: Callback ketika status siklus hidup aplikasi berubah
+  /// Alur: Jika aplikasi kembali dari background, otomatis refresh agenda.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -51,6 +90,15 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
     }
   }
 
+  /// Fungsi: Mengambil data agenda sekolah dari server API berdasarkan bulan dan tahun terpilih.
+  /// Alur:
+  /// 1. Menyalakan status loading spinner (`_isLoading = true`).
+  /// 2. Memanggil API `ApiService().getAgenda(month, year)`.
+  /// 3. Jika respon sukses (`success == true`):
+  ///    - Memetakan array JSON hasil API ke dalam list objek `AgendaItem`.
+  ///    - Mengurutkan agenda berdasarkan tanggal secara ascending (dari awal bulan ke akhir bulan).
+  ///    - Memanggil [_filterAgenda()] untuk memilah data berdasarkan tab yang aktif.
+  /// 4. Jika respon gagal atau error koneksi: Mengosongkan data dan menyajikan pesan error.
   Future<void> _fetchAgenda(int month, int year) async {
     if (!mounted) return;
     setState(() { _isLoading = true; _errorMessage = ''; });
@@ -109,10 +157,21 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
     }
   }
 
+  /// Fungsi: Memfilter seluruh agenda sekolah menjadi agenda mendatang (upcoming) atau lampau (past).
+  /// Alur:
+  /// 1. Menentukan tanggal hari ini (tanpa jam/menit).
+  /// 2. Menghitung jumlah agenda mendatang (`_upcomingCount`) dengan memfilter tanggal agenda >= hari ini.
+  /// 3. Menghitung jumlah agenda lampau (`_pastCount`) dengan sisa total agenda.
+  /// 4. Jika tab aktif 'upcoming':
+  ///    - Memfilter agenda dengan tanggal >= hari ini.
+  ///    - Mengurutkannya dari yang terdekat (soonest first).
+  /// 5. Jika tab aktif 'past':
+  ///    - Memfilter agenda dengan tanggal < hari ini.
+  ///    - Mengurutkannya dari yang paling baru dilewati (newest first).
+  /// 6. Mengupdate `_agendaList` di state agar UI merender kartu agenda yang sesuai.
   void _filterAgenda() {
     final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     
-    // Calculate counts
     _upcomingCount = _allAgendaList.where((item) {
       try {
         final date = DateFormat('yyyy-MM-dd').parse(item.tanggal);
@@ -136,7 +195,6 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
         }
       }).toList();
       
-      // Sort upcoming ascending (soonest first)
       filteredList.sort((a, b) {
         try { return DateFormat('yyyy-MM-dd').parse(a.tanggal)
             .compareTo(DateFormat('yyyy-MM-dd').parse(b.tanggal)); }
@@ -158,7 +216,6 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
         }
       }).toList();
       
-      // Sort past descending (newest first)
       filteredList.sort((a, b) {
         try { return DateFormat('yyyy-MM-dd').parse(b.tanggal)
             .compareTo(DateFormat('yyyy-MM-dd').parse(a.tanggal)); }
@@ -177,11 +234,24 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
     });
   }
 
+  /// Fungsi: Memformat tanggal string ('yyyy-MM-dd') menjadi penamaan Indonesia ('dd MMMM yyyy').
   String _formatTanggal(String s) {
     try { return DateFormat("dd MMMM yyyy", "id_ID").format(DateFormat("yyyy-MM-dd").parse(s)); }
     catch (e) { return s; }
   }
 
+  /// Fungsi: Metode render UI utama layar kalender.
+  /// Alur:
+  /// 1. Merender halaman berselimut `DarkBackground`.
+  /// 2. Header berisi teks judul 'Kalender Kegiatan'.
+  /// 3. Kartu Kalender (`TableCalendar`) di dalam `GlassCard`:
+  ///    - Menampilkan kisi-kisi penanggalan bulanan secara visual.
+  ///    - Ketika baris kalender digeser ke bulan lain, secara otomatis menembak API [_fetchAgenda] baru.
+  /// 4. Tab Switcher Premium: Rangkaian tombol interaktif 'Mendatang' dan 'Lampau' lengkap dengan gelembung badge jumlah agenda.
+  /// 5. Daftar Kegiatan (`RefreshIndicator` + `ListView`):
+  ///    - Jika loading: Renders spinner putar.
+  ///    - Jika data kosong: Renders ikon kalender kosong dan teks error.
+  ///    - Jika ada data: Renders susunan kartu kegiatan sekolah menggunakan [_buildAgendaCard()].
   @override
   Widget build(BuildContext context) {
     return DarkBackground(
@@ -193,7 +263,6 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
               padding: const EdgeInsets.fromLTRB(24, 22, 24, 12),
               child: Text('Kalender Kegiatan', style: AppTheme.heading1),
             ),
-            // Calendar
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
               child: GlassCard(
@@ -238,7 +307,6 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
               ),
             ),
             const SizedBox(height: 12),
-            // Premium Tab Switcher
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Container(
@@ -281,7 +349,6 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
               ),
             ),
             const SizedBox(height: 12),
-            // Agenda list
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () => _fetchAgenda(_focusedDay.month, _focusedDay.year),
@@ -319,6 +386,9 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
     );
   }
 
+  /// Fungsi: Merender baris kartu agenda tunggal yang dihias kaca transparan (Glassmorphism).
+  /// Parameter: [AgendaItem item] (Objek data agenda).
+  /// Alur: Renders lingkaran penunjuk warna cyan (neon accent), disusul nama kegiatan, tanggal terformat, dan teks deskripsi detail acara jika ada.
   Widget _buildAgendaCard(AgendaItem item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -346,6 +416,13 @@ class _KalenderScreenState extends State<KalenderScreen> with WidgetsBindingObse
     );
   }
 
+  /// Fungsi: Membangun tombol tab khusus yang elegan lengkap dengan animasi warna.
+  /// Parameter:
+  /// - [String title] (Label tab seperti "Mendatang")
+  /// - [int count] (Jumlah kuantitas agenda)
+  /// - [bool isActive] (Apakah tab ini sedang aktif terpilih)
+  /// - [VoidCallback onTap] (Fungsi aksi saat diklik)
+  /// Alur: Menggunakan [AnimatedContainer] untuk transisi gradien warna accent yang mulus ketika berpindah tab.
   Widget _buildTabButton({
     required String title,
     required int count,

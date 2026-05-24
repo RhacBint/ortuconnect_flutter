@@ -27,6 +27,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   String _kehadiranStatus = 'Data kehadiran tidak tersedia';
   String _izinStatus = 'Belum ada izin terbaru';
   String _idSiswa = '';
+  String _izinJenis = '';
+  String _izinTanggal = '';
+  int _jumlahHadir = 0;
+  int _totalHari = 0;
+  double _kehadiranPersen = 0.0;
+  List<String> _mingguIniStatus = ['-', '-', '-', '-', '-'];
 
   @override
   void initState() {
@@ -68,9 +74,31 @@ class _DashboardScreenState extends State<DashboardScreen>
       _parseAgenda(data['agenda_mendatang']);
       if (data['kehadiran_minggu_ini'] is Map) {
         final k = data['kehadiran_minggu_ini'] as Map<String, dynamic>;
-        final hadir = k['jumlah_hadir'] ?? k['hadir'] ?? '0';
-        final total = k['total_hari'] ?? '5';
-        _kehadiranStatus = 'Hadir: $hadir/$total hari';
+        _jumlahHadir = int.tryParse(k['jumlah_hadir']?.toString() ?? '0') ?? 0;
+        _totalHari = int.tryParse(k['total_hari']?.toString() ?? '0') ?? 0;
+        _kehadiranPersen = _totalHari > 0 ? (_jumlahHadir / _totalHari) : 0.0;
+        _kehadiranStatus = 'Hadir: $_jumlahHadir/$_totalHari hari';
+
+        // Parse detail absensi pekan ini (Senin - Jumat)
+        _mingguIniStatus = ['-', '-', '-', '-', '-'];
+        if (k['detail'] is List) {
+          final detailList = k['detail'] as List;
+          for (final item in detailList) {
+            if (item is Map<String, dynamic>) {
+              final tglStr = item['tanggal']?.toString() ?? '';
+              final status = item['status']?.toString() ?? '';
+              if (tglStr.isNotEmpty) {
+                final dt = _parseDate(tglStr);
+                if (dt != null) {
+                  final dayIndex = dt.weekday - 1;
+                  if (dayIndex >= 0 && dayIndex < 5) {
+                    _mingguIniStatus[dayIndex] = status;
+                  }
+                }
+              }
+            }
+          }
+        }
       }
       _parseIzin(data['izin_terbaru']);
       if (mounted)
@@ -127,6 +155,8 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   void _parseIzin(dynamic raw) {
     _izinStatus = 'Belum ada izin terbaru';
+    _izinJenis = '';
+    _izinTanggal = '';
     if (raw == null) return;
     Map<String, dynamic>? izin;
     if (raw is Map<String, dynamic>) {
@@ -137,15 +167,33 @@ class _DashboardScreenState extends State<DashboardScreen>
       izin = raw.first as Map<String, dynamic>;
     }
     if (izin != null) {
-      final status = izin['status']?.toString() ?? 'Menunggu';
-      final jenis = izin['jenis_izin']?.toString() ?? '';
+      _izinStatus = izin['status']?.toString() ?? 'Menunggu';
+      if (_izinStatus.isEmpty) _izinStatus = 'Menunggu';
+      _izinJenis = izin['jenis_izin']?.toString() ?? '';
       final tgl = izin['tanggal_pengajuan']?.toString() ?? '';
-      final sb = StringBuffer(status.isEmpty ? 'Menunggu' : status);
-      if (jenis.isNotEmpty) sb.write(' ($jenis)');
-      if (tgl.isNotEmpty && !tgl.contains('0000'))
-        sb.write('\n${_formatTanggal(tgl.split(' ')[0])}');
-      _izinStatus = sb.toString();
+      if (tgl.isNotEmpty && !tgl.contains('0000')) {
+        _izinTanggal = _formatTanggal(tgl.split(' ')[0]);
+      }
     }
+  }
+
+  String get _kehadiranDeskripsi {
+    if (_mingguIniStatus.every((s) => s == '-')) {
+      return 'Belum ada data kehadiran pekan ini';
+    }
+    final sakit = _mingguIniStatus.where((s) => s == 'Sakit').length;
+    final izin = _mingguIniStatus.where((s) => s == 'Izin').length;
+    final alfa = _mingguIniStatus.where((s) => s == 'Alfa').length;
+    
+    final List<String> parts = [];
+    if (sakit > 0) parts.add('$sakit hari Sakit');
+    if (izin > 0) parts.add('$izin hari Izin');
+    if (alfa > 0) parts.add('$alfa hari Alfa');
+    
+    if (parts.isEmpty) {
+      return 'Kehadiran pekan ini sempurna!';
+    }
+    return 'Pekan ini: ${parts.join(', ')}';
   }
 
   DateTime? _parseDate(String s) {
@@ -512,14 +560,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                   fit: StackFit.expand,
                   children: [
                     CircularProgressIndicator(
-                      value: 0.8,
+                      value: _kehadiranPersen,
                       strokeWidth: 6,
                       backgroundColor: Colors.white.withValues(alpha: 0.05),
                       color: AppTheme.indigo,
                     ),
                     Center(
                       child: Text(
-                        "80%",
+                        "${(_kehadiranPersen * 100).toStringAsFixed(0)}%",
                         style: AppTheme.label.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 10,
@@ -532,10 +580,20 @@ class _DashboardScreenState extends State<DashboardScreen>
             ],
           ),
           const SizedBox(height: 16),
-          // Bar Visual Absensi - Tebal seperti gambar
+          // Bar Visual Absensi - Dinamis Senin-Jumat dari detail absensi DB
           Row(
             children: List.generate(5, (index) {
-              Color barColor = index < 4 ? AppTheme.success : AppTheme.warning;
+              final status = _mingguIniStatus[index];
+              Color barColor;
+              if (status == 'Hadir') {
+                barColor = AppTheme.success;
+              } else if (status == 'Sakit' || status == 'Izin') {
+                barColor = AppTheme.warning;
+              } else if (status == 'Alfa') {
+                barColor = AppTheme.error;
+              } else {
+                barColor = Colors.white.withValues(alpha: 0.05); // belum absen / libur
+              }
               return Expanded(
                 child: Container(
                   height: 10,
@@ -550,7 +608,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            '"Satu hari izin sakit"',
+            '"$_kehadiranDeskripsi"',
             style: AppTheme.bodySmall.copyWith(
               fontStyle: FontStyle.italic,
               color: AppTheme.textSecondary,
@@ -628,7 +686,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             ],
           ),
           const SizedBox(height: 16),
-          // Nested Info Card
+          // Nested Info Card - Menggunakan Jenis Izin asli dari database
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -651,7 +709,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _izinStatus.split(' (').first,
+                      _izinJenis.isNotEmpty ? _izinJenis : '-',
                       style: AppTheme.bodyLarge.copyWith(
                         color: AppTheme.primary,
                         fontWeight: FontWeight.bold,
@@ -670,40 +728,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text('18 Mei 2024', style: AppTheme.bodyLarge),
+                    Text(
+                      _izinTanggal.isNotEmpty ? _izinTanggal : '-',
+                      style: AppTheme.bodyLarge,
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _cardW(String icon, String label, Widget child) {
-    return GlassCard(
-      borderRadius: 24,
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: AppTheme.primary.withValues(alpha: 0.12),
-            ),
-            child: Image.asset(icon, width: 28, height: 28),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: AppTheme.label),
-                const SizedBox(height: 4),
-                child,
               ],
             ),
           ),
