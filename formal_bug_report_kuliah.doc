@@ -1,0 +1,629 @@
+<html xmlns:o="urn:schemas-microsoft-error-defaults:office:office" xmlns:w="urn:schemas-microsoft-error-defaults:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Laporan Bug - OrtuConnect</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2.54cm 2.54cm 2.54cm 2.54cm; /* Standard 1-inch margins */
+        }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #2D3748;
+        }
+        h1 {
+            font-size: 18pt;
+            color: #3F51B5; /* Theme Purple/Indigo */
+            text-align: center;
+            margin-bottom: 2pt;
+            font-weight: bold;
+        }
+        .subtitle {
+            font-size: 11pt;
+            text-align: center;
+            color: #4A5568;
+            margin-bottom: 20pt;
+            font-style: italic;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #CBD5E0;
+            margin-top: 15pt;
+            margin-bottom: 15pt;
+        }
+        h2 {
+            font-size: 14pt;
+            color: #1A202C;
+            border-bottom: 2px solid #3F51B5;
+            padding-bottom: 4pt;
+            margin-top: 20pt;
+            margin-bottom: 10pt;
+        }
+        h3 {
+            font-size: 12pt;
+            color: #2D3748;
+            margin-top: 15pt;
+            margin-bottom: 6pt;
+            background-color: #F7FAFC;
+            padding: 4pt 8pt;
+            border-left: 4px solid #3F51B5;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8pt;
+            margin-bottom: 12pt;
+            font-size: 10pt;
+        }
+        th, td {
+            border: 1px solid #CBD5E0;
+            padding: 8pt 10pt;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #3F51B5;
+            color: #FFFFFF;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #F8FAFC;
+        }
+        .param-col {
+            width: 25%;
+            font-weight: bold;
+            background-color: #EDF2F7;
+            color: #2D3748;
+        }
+        .val-col {
+            width: 75%;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2pt 6pt;
+            font-weight: bold;
+            font-size: 9pt;
+            border-radius: 4pt;
+            text-align: center;
+        }
+        .badge-high {
+            background-color: #FED7D7;
+            color: #9B2C2C;
+        }
+        .badge-medium {
+            background-color: #FEEBC8;
+            color: #9C4221;
+        }
+        .badge-low {
+            background-color: #E2E8F0;
+            color: #4A5568;
+        }
+        .badge-resolved {
+            background-color: #C6F6D5;
+            color: #22543D;
+        }
+        .bullet-list {
+            margin: 0;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>DOKUMEN PENGUJIAN DAN LAPORAN BUG (BUG REPORT)</h1>
+    <div class="subtitle">
+        <b>PROYEK: ORTUCONNECT (SISTEM PEMANTAUAN SISWA UNTUK ORANG TUA)</b><br>
+        Mata Kuliah: Pengembangan Aplikasi Mobile & Web – Semester 4
+    </div>
+
+    <h2>I. IDENTITAS PROYEK</h2>
+    <ul>
+        <li><b>Nama Sistem:</b> OrtuConnect (Aplikasi Mobile Orang Tua & Web Panel Sekolah)</li>
+        <li><b>Teknologi:</b> Flutter SDK (Mobile) & Laravel Framework (API/Backend)</li>
+        <li><b>Basis Data:</b> SQLite (Lokal Perangkat Mobile) & MySQL (Server Backend)</li>
+        <li><b>Metode Pengujian:</b> Black-Box Testing & White-Box Debugging</li>
+        <li><b>Status Proyek:</b> <span class="badge badge-resolved">Stabil / Selesai (All Bugs 100% Resolved)</span></li>
+    </ul>
+
+    <hr>
+
+    <h2>II. MATRIKS RINGKASAN TEMUAN BUG</h2>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 12%;">Bug ID</th>
+                <th style="width: 20%;">Fitur / Modul</th>
+                <th style="width: 38%;">Deskripsi Singkat</th>
+                <th style="width: 18%;">Tingkat Keparahan</th>
+                <th style="width: 12%;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><b>BUG-001</b></td>
+                <td>Environment SDK</td>
+                <td>Perintah `flutter` tidak dikenali oleh terminal Windows.</td>
+                <td><span class="badge badge-medium">Medium</span></td>
+                <td><span class="badge badge-resolved">Resolved</span></td>
+            </tr>
+            <tr>
+                <td><b>BUG-002</b></td>
+                <td>API Perizinan</td>
+                <td>Server Laravel Crash (Error 500) saat pengiriman push notification FCM.</td>
+                <td><span class="badge badge-high">High (Critical)</span></td>
+                <td><span class="badge badge-resolved">Resolved</span></td>
+            </tr>
+            <tr>
+                <td><b>BUG-003</b></td>
+                <td>Notifikasi Mobile</td>
+                <td>FCM tidak memicu penyimpanan log riwayat notifikasi lokal SQLite.</td>
+                <td><span class="badge badge-high">High</span></td>
+                <td><span class="badge badge-resolved">Resolved</span></td>
+            </tr>
+            <tr>
+                <td><b>BUG-004</b></td>
+                <td>UI / Antarmuka</td>
+                <td>Inkonsistensi visual, layout tidak seimbang, dan font standar yang kaku.</td>
+                <td><span class="badge badge-low">Low</span></td>
+                <td><span class="badge badge-resolved">Resolved</span></td>
+            </tr>
+            <tr>
+                <td><b>BUG-005</b></td>
+                <td>Launch Screen</td>
+                <td>Kilatan layar putih/biru tidak rapi pada startup awal aplikasi Android.</td>
+                <td><span class="badge badge-medium">Medium</span></td>
+                <td><span class="badge badge-resolved">Resolved</span></td>
+            </tr>
+            <tr>
+                <td><b>BUG-006</b></td>
+                <td>Dashboard Izin</td>
+                <td>Kolom jenis perizinan menampilkan status approval (Disetujui/Menunggu) bukannya Sakit/Izin.</td>
+                <td><span class="badge badge-medium">Medium</span></td>
+                <td><span class="badge badge-resolved">Resolved</span></td>
+            </tr>
+            <tr>
+                <td><b>BUG-007</b></td>
+                <td>Dashboard Izin</td>
+                <td>Tanggal pengajuan izin terakhir terkunci statis pada tanggal 18 Mei 2024.</td>
+                <td><span class="badge badge-medium">Medium</span></td>
+                <td><span class="badge badge-resolved">Resolved</span></td>
+            </tr>
+            <tr>
+                <td><b>BUG-008</b></td>
+                <td>Dashboard Absen</td>
+                <td>Lingkaran progress persen, 5 bar harian, dan teks keterangan absensi bersifat statis (hardcoded).</td>
+                <td><span class="badge badge-medium">Medium</span></td>
+                <td><span class="badge badge-resolved">Resolved</span></td>
+            </tr>
+            <tr>
+                <td><b>BUG-009</b></td>
+                <td>Kompilasi Proyek</td>
+                <td>Eror kompilasi fatal `Missing concrete implementation of State.build` pada halaman perizinan.</td>
+                <td><span class="badge badge-high">High (Critical)</span></td>
+                <td><span class="badge badge-resolved">Resolved</span></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <hr style="page-break-before: always;">
+
+    <h2>III. RINCIAN LAPORAN BUG TERSTRUKTUR</h2>
+
+    <h3>BUG-001: Kegagalan Inisialisasi Environment Flutter SDK</h3>
+    <table>
+        <tr>
+            <td class="param-col">Bug ID</td>
+            <td class="val-col">BUG-001</td>
+        </tr>
+        <tr>
+            <td class="param-col">Modul / Fitur</td>
+            <td class="val-col">Lingkungan Pengembangan (Development Environment)</td>
+        </tr>
+        <tr>
+            <td class="param-col">Tingkat Keparahan</td>
+            <td class="val-col"><span class="badge badge-medium">Medium</span> (Menghambat jalannya proses kompilasi/debugging awal)</td>
+        </tr>
+        <tr>
+            <td class="param-col">Deskripsi Masalah</td>
+            <td class="val-col">Terminal VS Code menampilkan pesan kesalahan: <code>flutter : The term 'flutter' is not recognized as the name of a cmdlet, function, or operable program.</code></td>
+        </tr>
+        <tr>
+            <td class="param-col">Langkah Reproduksi</td>
+            <td class="val-col">
+                1. Buka terminal VS Code di direktori proyek.<br>
+                2. Jalankan perintah <code>flutter doctor</code> atau <code>flutter run</code>.
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Dampak</td>
+            <td class="val-col">Developer tidak dapat melakukan pengujian, <i>build</i>, maupun kompilasi aplikasi mobile sama sekali.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Penyebab Teknis</td>
+            <td class="val-col">Jalur folder eksekusi Flutter SDK (<code>bin</code>) belum didaftarkan ke dalam variabel lingkungan sistem (<code>Environment Variables</code> -> <code>Path</code>) di Windows.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Solusi & Perbaikan</td>
+            <td class="val-col">Menambahkan direktori absolut <code>flutter\bin</code> ke dalam variabel <code>Path</code> sistem operasi Windows, kemudian memuat ulang (restart) perangkat lunak terminal IDE.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Status</td>
+            <td class="val-col"><span class="badge badge-resolved">RESOLVED (Selesai)</span></td>
+        </tr>
+    </table>
+
+    <h3>BUG-002: Crash Server API pada Modul Perizinan Laravel (Production Server)</h3>
+    <table>
+        <tr>
+            <td class="param-col">Bug ID</td>
+            <td class="val-col">BUG-002</td>
+        </tr>
+        <tr>
+            <td class="param-col">Modul / Fitur</td>
+            <td class="val-col">Web API Perizinan & Firebase Cloud Messaging (FCM) Backend</td>
+        </tr>
+        <tr>
+            <td class="param-col">Tingkat Keparahan</td>
+            <td class="val-col"><span class="badge badge-high">High (Critical)</span> (Menyebabkan kegagalan sistem web total/Error 500)</td>
+        </tr>
+        <tr>
+            <td class="param-col">Deskripsi Masalah</td>
+            <td class="val-col">API perizinan dari mobile memicu kegagalan server total (Internal Server Error 500) saat admin mengubah status izin siswa (disetujui/ditolak) di server produksi Hostinger.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Langkah Reproduksi</td>
+            <td class="val-col">
+                1. Akses halaman admin web OrtuConnect.<br>
+                2. Ubah status persetujuan surat izin siswa.<br>
+                3. Klik simpan. Server menghasilkan halaman putih kosong dengan kode Error 500.
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Dampak</td>
+            <td class="val-col">Proses perubahan status data terhenti, admin gagal memperbarui izin, dan aplikasi mobile tidak menerima notifikasi pembaruan status.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Penyebab Teknis</td>
+            <td class="val-col">Konflik dependensi pustaka Firebase PHP SDK pada lingkungan hosting produksi (Hostinger) serta ketiadaan file kredensial <code>firebase_credentials.json</code> yang dapat diakses secara dinamis oleh framework.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Solusi & Perbaikan</td>
+            <td class="val-col">
+                1. Melakukan restrukturisasi kode penanganan error (blok <code>try-catch</code>) di <code>PerizinanController</code> Laravel agar kegagalan FCM tidak membatalkan penyimpanan database.<br>
+                2. Menyelaraskan path konfigurasi kredensial Firebase Service Account agar fleksibel di lingkungan <i>shared hosting</i>.
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Status</td>
+            <td class="val-col"><span class="badge badge-resolved">RESOLVED (Selesai)</span></td>
+        </tr>
+    </table>
+
+    <h3>BUG-003: Kegagalan Sinkronisasi Log Riwayat Notifikasi Lokal (SQLite)</h3>
+    <table>
+        <tr>
+            <td class="param-col">Bug ID</td>
+            <td class="val-col">BUG-003</td>
+        </tr>
+        <tr>
+            <td class="param-col">Modul / Fitur</td>
+            <td class="val-col">Notifikasi Masuk (FCM Background Receiver) & Penyimpanan Lokal</td>
+        </tr>
+        <tr>
+            <td class="param-col">Tingkat Keparahan</td>
+            <td class="val-col"><span class="badge badge-high">High</span> (Data historis notifikasi hilang ketika aplikasi ditutup)</td>
+        </tr>
+        <tr>
+            <td class="param-col">Deskripsi Masalah</td>
+            <td class="val-col">Aplikasi dapat menampilkan notifikasi <i>pop-up</i> saat aktif (<i>foreground</i>), namun ketika aplikasi sedang ditutup, notifikasi yang masuk dari server tidak tersimpan ke dalam riwayat halaman Notifikasi di aplikasi.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Langkah Reproduksi</td>
+            <td class="val-col">
+                1. Tutup aplikasi OrtuConnect di HP.<br>
+                2. Kirim notifikasi agenda baru dari server backend.<br>
+                3. Buka aplikasi OrtuConnect, lalu akses halaman "Notifikasi". Halaman riwayat kosong.
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Dampak</td>
+            <td class="val-col">Orang tua kehilangan informasi penting (seperti pengumuman agenda) karena tidak dapat membaca kembali riwayat pemberitahuan yang terlewat.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Penyebab Teknis</td>
+            <td class="val-col">Ketiadaan kode <i>background message handler</i> untuk memproses payload notifikasi dan tidak adanya integrasi database lokal saat aplikasi berada dalam status <i>terminated</i> / <i>background</i>.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Solusi & Perbaikan</td>
+            <td class="val-col">
+                1. Mengintegrasikan paket <b><code>sqflite</code></b> untuk membuat basis data lokal di perangkat HP.<br>
+                2. Mengatur fungsi <i>handler</i> statis <code>_firebaseMessagingBackgroundHandler</code> di <code>main.dart</code> untuk langsung melakukan <i>insert query</i> ke SQLite lokal saat pesan push masuk.
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Status</td>
+            <td class="val-col"><span class="badge badge-resolved">RESOLVED (Selesai)</span></td>
+        </tr>
+    </table>
+
+    <h3>BUG-004: Inkonsistensi Visual & Tipografi Antarmuka Aplikasi</h3>
+    <table>
+        <tr>
+            <td class="param-col">Bug ID</td>
+            <td class="val-col">BUG-004</td>
+        </tr>
+        <tr>
+            <td class="param-col">Modul / Fitur</td>
+            <td class="val-col">Antarmuka Pengguna (UI/UX) - Absensi & Profil</td>
+        </tr>
+        <tr>
+            <td class="param-col">Tingkat Keparahan</td>
+            <td class="val-col"><span class="badge badge-low">Low</span> (Hanya memengaruhi estetika dan kenyamanan visual pengguna)</td>
+        </tr>
+        <tr>
+            <td class="param-col">Deskripsi Masalah</td>
+            <td class="val-col">Penataan tata letak pada layar Dashboard, Absensi, dan Profil kurang konsisten. Penggunaan warna latar belakang sangat kaku, serta tipe huruf yang digunakan adalah font sans-serif standar sistem yang kurang modern.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Langkah Reproduksi</td>
+            <td class="val-col">
+                1. Buka aplikasi mobile OrtuConnect.<br>
+                2. Navigasi ke halaman Absensi atau Profil.<br>
+                3. Terlihat teks dan kontainer UI terasa kaku dan kurang interaktif.
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Dampak</td>
+            <td class="val-col">Pengalaman pengguna (<i>User Experience</i>) kurang menarik dan aplikasi terasa kurang premium atau kurang profesional untuk skala instansi.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Penyebab Teknis</td>
+            <td class="val-col">Warna diatur secara statis (<i>hardcoded</i>) di masing-masing file tampilan tanpa sistem tema global (<code>ThemeData</code>), serta tidak terdaftarnya font kustom modern pada file konfigurasi proyek.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Solusi & Perbaikan</td>
+            <td class="val-col">
+                1. Mengonfigurasi kelas penampung tema global <b><code>AppTheme</code></b> bertema <b>Dark Premium Glassmorphism</b>.<br>
+                2. Memasang font <b>Poppins</b> secara global melalui Google Fonts SDK.<br>
+                3. Membuat widget kustom <code>GlassCard</code> semi-transparan dan mengintegrasikan <b><code>fl_chart</code></b> untuk menyajikan grafik donat statistik kehadiran yang modern.
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Status</td>
+            <td class="val-col"><span class="badge badge-resolved">RESOLVED (Selesai)</span></td>
+        </tr>
+    </table>
+
+    <h3>BUG-005: Flashing & Distorsi Visual pada Native Boot Screen Android</h3>
+    <table>
+        <tr>
+            <td class="param-col">Bug ID</td>
+            <td class="val-col">BUG-005</td>
+        </tr>
+        <tr>
+            <td class="param-col">Modul / Fitur</td>
+            <td class="val-col">Layar Startup Sistem Operasi (Native Android Splash Screen)</td>
+        </tr>
+        <tr>
+            <td class="param-col">Tingkat Keparahan</td>
+            <td class="val-col"><span class="badge badge-medium">Medium</span> (Mengganggu konsistensi transisi awal aplikasi saat dibuka)</td>
+        </tr>
+        <tr>
+            <td class="param-col">Deskripsi Masalah</td>
+            <td class="val-col">Saat aplikasi dibuka dari keadaan mati (<i>cold start</i>), muncul kedipan layar putih polos di HP Android standar. Sedangkan di HP Android 12+, muncul layar berwarna biru terang dengan logo bawaan yang melar (<i>stretched</i>) tidak proporsional di tengah sebelum masuk ke layar utama.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Langkah Reproduksi</td>
+            <td class="val-col">
+                1. Hentikan aplikasi secara paksa (<i>Force Stop</i>).<br>
+                2. Klik ikon aplikasi OrtuConnect di menu HP untuk membukanya.<br>
+                3. Perhatikan layar boot native awal sebelum masuk ke tampilan beranimasi.
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Dampak</td>
+            <td class="val-col">Visual awal aplikasi terasa tidak rapi, pecah, dan terjadi kedipan kontras warna (terang ke gelap) yang kurang nyaman bagi mata pengguna.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Penyebab Teknis</td>
+            <td class="val-col">File XML bawaan <code>launch_background.xml</code> di Android masih diatur ke warna putih polos (<code>@android:color/white</code>). Selain itu, gaya <code>LaunchTheme</code> untuk Android 12+ (SDK 31+) masih memuat warna default biru (<code>#007ABF</code>) dengan aset logo beresolusi rendah (<code>android12splash</code>).</td>
+        </tr>
+        <tr>
+            <td class="param-col">Solusi & Perbaikan</td>
+            <td class="val-col">
+                1. Mengubah latar belakang pada file <code>launch_background.xml</code> (di folder <code>drawable</code> dan <code>drawable-v21</code>) menjadi warna gelap <code>#0A0A0F</code> dan menyematkan logo <code>@mipmap/ic_launcher</code> di bagian tengah.<br>
+                2. Mengubah nilai <code>android:windowSplashScreenBackground</code> menjadi <code>#0A0A0F</code> dan mengarahkan <code>android:windowSplashScreenAnimatedIcon</code> ke <code>@mipmap/ic_launcher</code> di file <code>values-v31/styles.xml</code> serta <code>values-night-v31/styles.xml</code>.
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Status</td>
+            <td class="val-col"><span class="badge badge-resolved">RESOLVED (Selesai)</span></td>
+        </tr>
+    </table>
+
+    <h3>BUG-006: Logika Pemisahan Data Salah pada Status Izin Dashboard (Status vs Jenis)</h3>
+    <table>
+        <tr>
+            <td class="param-col">Bug ID</td>
+            <td class="val-col">BUG-006</td>
+        </tr>
+        <tr>
+            <td class="param-col">Modul / Fitur</td>
+            <td class="val-col">Dashboard (Layar Utama Mobile) - Kotak Informasi Perizinan</td>
+        </tr>
+        <tr>
+            <td class="param-col">Tingkat Keparahan</td>
+            <td class="val-col"><span class="badge badge-medium">Medium</span> (Kesalahan visual dan ketidaksesuaian makna informasi data murid)</td>
+        </tr>
+        <tr>
+            <td class="param-col">Deskripsi Masalah</td>
+            <td class="val-col">Di bawah label teks <b>"JENIS PERIZINAN"</b>, dashboard menampilkan kata status persetujuan seperti <b>"Disetujui"</b> atau <b>"Menunggu"</b> bukannya tipe izin seperti <b>"Sakit"</b> atau <b>"Izin"</b>.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Langkah Reproduksi</td>
+            <td class="val-col">
+                1. Ajukan perizinan "Sakit" baru.<br>
+                2. Buka halaman Dashboard utama.<br>
+                3. Perhatikan kontainer "Status Izin Terakhir". Pada baris "JENIS PERIZINAN" memuat kata "Menunggu" atau "Disetujui" bukannya "Sakit".
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Dampak</td>
+            <td class="val-col">Pengguna bingung dan kehilangan detail mengenai jenis surat perizinan yang sedang diproses.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Penyebab Teknis</td>
+            <td class="val-col">Fungsi memproses izin menggabungkan semua informasi ke dalam satu string <code>_izinStatus</code> berformat <code>"Status (Jenis Izin)\nTanggal"</code>. Tampilan UI memisahkan data dengan fungsi <code>_izinStatus.split(' (').first</code> yang secara keliru mengambil potongan string awal sebelum tanda kurung (yaitu data status).</td>
+        </tr>
+        <tr>
+            <td class="param-col">Solusi & Perbaikan</td>
+            <td class="val-col">Mereaktor fungsi <code>_parseIzin()</code> untuk menyimpan masing-masing kolom database ke variabel state terpisah: <code>_izinStatus</code>, <code>_izinJenis</code> (jenis perizinan), dan <code>_izinTanggal</code> secara bersih. Layout UI kemudian memanggil <code>_izinJenis</code> secara langsung.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Status</td>
+            <td class="val-col"><span class="badge badge-resolved">RESOLVED (Selesai)</span></td>
+        </tr>
+    </table>
+
+    <h3>BUG-007: Tanggal Pengajuan Izin Ter-Hardcode (Statis) pada Beranda</h3>
+    <table>
+        <tr>
+            <td class="param-col">Bug ID</td>
+            <td class="val-col">BUG-007</td>
+        </tr>
+        <tr>
+            <td class="param-col">Modul / Fitur</td>
+            <td class="val-col">Dashboard (Layar Utama Mobile) - Detail Tanggal Perizinan</td>
+        </tr>
+        <tr>
+            <td class="param-col">Tingkat Keparahan</td>
+            <td class="val-col"><span class="badge badge-medium">Medium</span> (Informasi riwayat tanggal tidak valid/tidak sinkron)</td>
+        </tr>
+        <tr>
+            <td class="param-col">Deskripsi Masalah</td>
+            <td class="val-col">Bagian tanggal pada kotak informasi status izin terakhir pada beranda terkunci statis menampilkan teks <b>'18 Mei 2024'</b> secara permanen, tidak mengikuti data aktual database.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Langkah Reproduksi</td>
+            <td class="val-col">
+                1. Kirim pengajuan perizinan baru pada tanggal yang berbeda (misal: 24 Mei 2026).<br>
+                2. Kembali ke halaman utama Dashboard.<br>
+                3. Tanggal detail perizinan tetap tertulis <code>'18 Mei 2024'</code>.
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Dampak</td>
+            <td class="val-col">Orang tua tidak mendapatkan informasi riil mengenai waktu pengiriman surat perizinan murid yang terakhir.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Penyebab Teknis</td>
+            <td class="val-col">Komponen widget <code>Text</code> pada detail perizinan dideklarasikan secara statis (<i>hardcoded</i>) di dalam file layout <code>dashboard_screen.dart</code> (baris 673: <code>Text('18 Mei 2024', style: AppTheme.bodyLarge)</code>).</td>
+        </tr>
+        <tr>
+            <td class="param-col">Solusi & Perbaikan</td>
+            <td class="val-col">Menghubungkan widget <code>Text</code> tersebut secara dinamis ke variabel state <code>_izinTanggal</code> yang diisi secara otomatis dari parsing kolom <code>tanggal_pengajuan</code> database API (dengan format pelindung <code>_izinTanggal.isNotEmpty ? _izinTanggal : '-'</code>).</td>
+        </tr>
+        <tr>
+            <td class="param-col">Status</td>
+            <td class="val-col"><span class="badge badge-resolved">RESOLVED (Selesai)</span></td>
+        </tr>
+    </table>
+
+    <h3>BUG-008: Visualisasi Grafik & Ringkasan Kehadiran Bersifat Statis (Hardcoded)</h3>
+    <table>
+        <tr>
+            <td class="param-col">Bug ID</td>
+            <td class="val-col">BUG-008</td>
+        </tr>
+        <tr>
+            <td class="param-col">Modul / Fitur</td>
+            <td class="val-col">Dashboard (Layar Utama Mobile) - Kotak Kehadiran Pekan Ini</td>
+        </tr>
+        <tr>
+            <td class="param-col">Tingkat Keparahan</td>
+            <td class="val-col"><span class="badge badge-medium">Medium</span> (Grafik visual absensi tidak mencerminkan data riil database)</td>
+        </tr>
+        <tr>
+            <td class="param-col">Deskripsi Masalah</td>
+            <td class="val-col">Komponen visual absensi di beranda tetap statis: lingkaran progress terkunci pada 80% (nilai <code>0.8</code>), visualisasi 5 bar harian terkunci pada 4 hijau dan 1 kuning, serta teks deskripsi terkunci pada tulisan <code>'"Satu hari izin sakit"'</code>.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Langkah Reproduksi</td>
+            <td class="val-col">
+                1. Buka halaman Dashboard murid yang memiliki kehadiran 100% (hadir 5 hari berturut-turut).<br>
+                2. Lingkaran progress tetap 80% dan bar harian tetap memuat 1 warna kuning.
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Dampak</td>
+            <td class="val-col">Tampilan absensi tidak sinkron dengan database, sehingga menyajikan data kehadiran murid yang menyesatkan orang tua.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Penyebab Teknis</td>
+            <td class="val-col">Seluruh variabel visual (progress value, generator warna bar harian, dan teks ringkasan) ditulis secara statis di kode GUI tanpa terhubung ke data detail array harian dari API database.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Solusi & Perbaikan</td>
+            <td class="val-col">
+                1. Menghitung persentase secara dinamis: <code>jumlah_hadir / total_hari</code>.<br>
+                2. Memetakan detail status harian (Senin-Jumat) dari database ke 5 bar warna secara otomatis (Hijau = Hadir, Kuning = Sakit/Izin, Merah = Alfa, Abu-Abu = Belum ada data).<br>
+                3. Membuat getter string dinamis <code>_kehadiranDeskripsi</code> yang menghitung rekapitulasi absen otomatis (misal: <i>"Pekan ini: 1 hari Sakit"</i> atau <i>"Kehadiran pekan ini sempurna!"</i>).
+            </td>
+        </tr>
+        <tr>
+            <td class="param-col">Status</td>
+            <td class="val-col"><span class="badge badge-resolved">RESOLVED (Selesai)</span></td>
+        </tr>
+    </table>
+
+    <h3>BUG-009: Eror Kompilasi Fatal Akibat Duplikasi Kelas State pada `perizinan_screen.dart`</h3>
+    <table>
+        <tr>
+            <td class="param-col">Bug ID</td>
+            <td class="val-col">BUG-009</td>
+        </tr>
+        <tr>
+            <td class="param-col">Modul / Fitur</td>
+            <td class="val-col">Kompilasi Proyek (Build / Compilation) - Perizinan</td>
+        </tr>
+        <tr>
+            <td class="param-col">Tingkat Keparahan</td>
+            <td class="val-col"><span class="badge badge-high">High (Critical)</span> (Menyebabkan kegagalan kompilasi total dan aplikasi tidak bisa di-run)</td>
+        </tr>
+        <tr>
+            <td class="param-col">Deskripsi Masalah</td>
+            <td class="val-col">Compiler menampilkan eror fatal <code>Missing concrete implementation of State.build</code> pada berkas <code>perizinan_screen.dart</code> baris 25, menghentikan seluruh proses build/run.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Langkah Reproduksi</td>
+            <td class="val-col">1. Jalankan perintah <code>flutter run</code> atau <code>flutter analyze</code> di terminal.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Dampak</td>
+            <td class="val-col">Developer tidak dapat menguji aplikasi di emulator maupun HP karena kompilasi dibatalkan.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Penyebab Teknis</td>
+            <td class="val-col">Adanya deklarasi kelas kosong <code>class _ProfileScreenState extends State&lt;PerizinanScreen&gt; {}</code> di baris 25 yang tidak memiliki metode wajib <code>build(BuildContext context)</code> di dalam file <code>perizinan_screen.dart</code>.</td>
+        </tr>
+        <tr>
+            <td class="param-col">Solusi & Perbaikan</td>
+            <td class="val-col">Menghapus baris deklarasi kelas kosong <code>_ProfileScreenState</code> tersebut secara permanen karena merupakan kode sisa penanda yang tidak terpakai, sehingga Flutter langsung menggunakan kelas State yang asli di bawahnya (<code>_PerizinanScreenState</code>).</td>
+        </tr>
+        <tr>
+            <td class="param-col">Status</td>
+            <td class="val-col"><span class="badge badge-resolved">RESOLVED (Selesai)</span></td>
+        </tr>
+    </table>
+
+    <hr>
+
+    <h2>IV. KESIMPULAN HASIL PENGUJIAN</h2>
+    <p>
+        Berdasarkan hasil pengujian akhir menggunakan metode <i>black-box</i> untuk alur fungsionalitas dan pengecekan kode sumber secara <i>white-box</i>, seluruh daftar bug kritis yang tercatat di atas (dari <b>BUG-001</b> hingga <b>BUG-009</b>) <b>telah ditangani secara menyeluruh (100% Resolved)</b>. Aplikasi OrtuConnect kini memiliki performa back-end yang tangguh, sistem pertukaran data notifikasi yang andal, visualisasi beranda yang dinamis terintegrasi database MySQL, serta memiliki desain visual terpadu berkelas premium yang berjalan mulus dari detik pertama dijalankan di perangkat ponsel pintar.
+    </p>
+
+</body>
+</html>
